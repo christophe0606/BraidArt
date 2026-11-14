@@ -36,7 +36,10 @@ locally signed, not notarized.
    current 3D view as a PNG, including its angle, zoom, pan, lighting and backing
    plane, at the viewport’s current pixel resolution.
 6. **Export Vector PDF** writes a single page of filled strand contours with
-   fine black outlines, edged underpass ends and no embedded images. **Export 3D Object
+   fine black outlines, edged underpass ends and no embedded images. Generation
+   starts after you choose a destination and click **Save**. A progress window
+   includes **Cancel**; cancelling preserves any existing destination file.
+   **Export 3D Object
    (GLB)** saves the same tube meshes and backing plane with normals and colored
    PBR materials in a self-contained glTF 2.0 file.
    Import the GLB directly in Blender using **File → Import → glTF 2.0**.

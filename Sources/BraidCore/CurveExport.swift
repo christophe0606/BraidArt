@@ -3,11 +3,28 @@ import CoreGraphics
 
 public enum CurveExporter {
     /// One page of filled vector strand contours with fine black edges, as in the reference PDF.
-    public static func writePDF(_ braid: BraidCurves, to url: URL, pointsPerTile: Double = 24) throws {
+    /// Reports progress on the calling thread. Cancellation leaves the destination untouched.
+    public static func writePDF(_ braid: BraidCurves, to url: URL, pointsPerTile: Double = 24,
+                                progress: (Double, String) -> Void = { _,_ in }) throws {
         guard pointsPerTile.isFinite,(1...1000).contains(pointsPerTile) else { throw BraidError.invalid("Invalid PDF scale.") }
+        try Task.checkCancellation()
+        progress(0,"Preparing vector PDF…")
+        let segmentCount=max(1,braid.curves.reduce(0) { $0+$1.segments.count })
+        var completedSegments=0.0,lastReport=ProcessInfo.processInfo.systemUptime
+        func reportDrawingProgress() throws {
+            try Task.checkCancellation()
+            let now=ProcessInfo.processInfo.systemUptime
+            if now-lastReport >= 0.1 {
+                progress(min(0.9,0.9*completedSegments/Double(segmentCount)),"Drawing strand contours…")
+                lastReport=now
+            }
+        }
         var box=CGRect(x:0,y:0,width:Double(braid.columns)*pointsPerTile,height:Double(braid.rows)*pointsPerTile)
         let output=NSMutableData()
         guard let consumer=CGDataConsumer(data:output),let ctx=CGContext(consumer:consumer,mediaBox:&box,nil) else { throw BraidError.invalid("Cannot create vector PDF.") }
+        // Also close the context on cancellation, while keeping partial bytes in memory.
+        var closed=false
+        defer { if !closed { ctx.endPDFPage();ctx.closePDF() } }
         ctx.beginPDFPage(nil)
         ctx.scaleBy(x:pointsPerTile,y:pointsPerTile)
         ctx.translateBy(x:-0.5,y:Double(braid.rows)+0.5)
@@ -20,10 +37,13 @@ public enum CurveExporter {
         ctx.setStrokeColor(red:0,green:0,blue:0,alpha:1)
         ctx.setLineWidth(edgeWidth);ctx.setLineJoin(.round)
         for curve in braid.curves {
+            try reportDrawingProgress()
             let color=braid.palette[curve.colorIndex]
             ctx.setFillColor(red:color.r,green:color.g,blue:color.b,alpha:1)
             var fragments=[[CurveSegment]](),current=[CurveSegment]()
             for s in curve.segments {
+                completedSegments+=0.5
+                try reportDrawingProgress()
                 if s.points.count==2 && !s.raised {
                     // Split the underpass before outlining it, giving the two exposed
                     // ends their own fine edges instead of erasing them with a mask.
@@ -40,9 +60,13 @@ public enum CurveExporter {
                 fragments[0]=current+fragments[0]
             } else if !current.isEmpty { fragments.append(current) }
             for fragment in fragments {
+                try reportDrawingProgress()
                 guard let first=fragment.first else { continue }
                 let path=CGMutablePath();path.move(to:CGPoint(x:first.start.x,y:first.start.y))
                 for s in fragment {
+                    // Each split underpass contributes two half segments to this pass.
+                    completedSegments += s.points.count==2 && !s.raised ? 0.25 : 0.5
+                    try reportDrawingProgress()
                     if s.points.count==2 || s.raised { path.addLine(to:CGPoint(x:s.end.x,y:s.end.y)) }
                     else { path.addCurve(to:CGPoint(x:s.end.x,y:s.end.y),control1:CGPoint(x:s.points[1].x,y:s.points[1].y),control2:CGPoint(x:s.points[2].x,y:s.points[2].y)) }
                 }
@@ -51,7 +75,14 @@ public enum CurveExporter {
                 ctx.addPath(contour);ctx.drawPath(using:.fillStroke)
             }
         }
+        try Task.checkCancellation()
+        progress(0.9,"Finishing vector PDF…")
         ctx.endPDFPage();ctx.closePDF()
+        closed=true
+        try Task.checkCancellation()
+        progress(0.97,"Saving PDF…")
+        try Task.checkCancellation()
         try (output as Data).write(to:url,options:.atomic)
+        progress(1,"PDF saved.")
     }
 }

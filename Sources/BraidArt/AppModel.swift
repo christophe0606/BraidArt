@@ -38,6 +38,7 @@ final class AppModel: ObservableObject {
     @Published var sceneSettings=SceneSettings()
     @Published var cameraReset=0
     @Published var obliqueCamera=false
+    @Published var pdfExport: PDFExportProgress?
     private weak var threeDView:BraidMetalView?
     private var sourceURL: URL?
     private var task: Task<Void,Never>?
@@ -45,6 +46,7 @@ final class AppModel: ObservableObject {
     private var preparedSettings: BraidCore.Settings?
     private var revision=0
     private var cachedTileData: TileData?
+    private var pdfSavePanel: NSSavePanel?
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? "CPU fallback" }
     var tileData: TileData { TileData(settings:settings) }
     var preparedIsCurrent: Bool { prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true }
@@ -140,7 +142,10 @@ final class AppModel: ObservableObject {
         }
     }
     private func update(_ p: Double,_ message: String) { progress=p;status=message }
-    func cancel() { task?.cancel();previewTask?.cancel() }
+    func cancel() {
+        if let pdfExport { pdfExport.cancelling=true;pdfExport.message="Cancelling PDF export…" }
+        task?.cancel();previewTask?.cancel()
+    }
     private func fail(_ err: Error) { busy=false;error=err.localizedDescription;status="Could not complete the operation." }
     func selectSolver() {
         let panel=NSOpenPanel();panel.message="Choose the COIN-OR CBC executable";panel.allowsMultipleSelection=false
@@ -212,10 +217,38 @@ final class AppModel: ObservableObject {
         } catch { fail(error) }
     }
     func exportPDF() {
-        guard let curves,!busy else { return }
+        guard curves != nil,!busy,pdfSavePanel == nil else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.pdf";panel.allowedContentTypes=[.pdf]
-        guard panel.runModal() == .OK,let url=panel.url else { return }
-        runExport("Exporting vector PDF…",success:"Saved \(url.lastPathComponent)") { try CurveExporter.writePDF(curves,to:url) }
+        pdfSavePanel=panel
+        let completion: (NSApplication.ModalResponse)->Void = { [weak self] response in
+            guard let self else { return }
+            self.pdfSavePanel=nil
+            guard response == .OK,let url=panel.url,let curves=self.curves,!self.busy else { return }
+            self.startPDFExport(curves,to:url)
+        }
+        if let window=NSApp.keyWindow { panel.beginSheetModal(for:window,completionHandler:completion) }
+        else { panel.begin(completionHandler:completion) }
+    }
+    private func startPDFExport(_ curves:BraidCurves,to url:URL) {
+        let export=PDFExportProgress(filename:url.lastPathComponent)
+        busy=true;progress=0;status="Exporting vector PDF…";pdfExport=export
+        task=Task {
+            do {
+                try await Task.detached(priority:.userInitiated) {
+                    try CurveExporter.writePDF(curves,to:url) { value,message in
+                        DispatchQueue.main.async {
+                            guard !export.cancelling else { return }
+                            export.progress=value;export.message=message
+                        }
+                    }
+                }.valueWithCancellation()
+                pdfExport=nil;busy=false;progress=1;status="Saved \(url.lastPathComponent)"
+            } catch is CancellationError {
+                pdfExport=nil;busy=false;progress=0;status="PDF export cancelled."
+            } catch {
+                pdfExport=nil;fail(error)
+            }
+        }
     }
     func exportGLB() {
         guard let curves,!busy else { return }

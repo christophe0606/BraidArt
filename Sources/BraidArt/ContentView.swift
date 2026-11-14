@@ -120,6 +120,7 @@ struct ContentView: View {
         }
         .onChange(of:model.sceneSettings) { _,_ in model.sceneSettingsChanged() }
         .onChange(of:model.settings) { _,_ in model.settingsChanged() }
+        .sheet(item:$model.pdfExport) { export in PDFExportView(export:export,cancel:model.cancel) }
         .alert("BraidArt",isPresented:Binding(get:{model.error != nil},set:{if !$0 {model.error=nil}})) { Button("OK") { model.error=nil } } message:{Text(model.error ?? "")}
     }
     private var prepareWorkspace: some View {

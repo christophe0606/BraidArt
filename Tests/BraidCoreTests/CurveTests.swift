@@ -93,7 +93,11 @@ final class CurveTests:XCTestCase {
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         try project.save(to:folder.appendingPathComponent("fixture.braidart"))
         let pdf=folder.appendingPathComponent("braid.pdf")
-        try CurveExporter.writePDF(braid,to:pdf)
+        var pdfProgress=[Double]()
+        try CurveExporter.writePDF(braid,to:pdf) { value,_ in pdfProgress.append(value) }
+        XCTAssertEqual(pdfProgress.first,0);XCTAssertEqual(pdfProgress.last,1)
+        XCTAssertEqual(pdfProgress,pdfProgress.sorted())
+        XCTAssertTrue(pdfProgress.allSatisfy { $0.isFinite && (0...1).contains($0) })
         let document=try XCTUnwrap(CGPDFDocument(pdf as CFURL));XCTAssertEqual(document.numberOfPages,1)
         let page=try XCTUnwrap(document.page(at:1));XCTAssertEqual(page.getBoxRect(.mediaBox).width,Double(braid.columns)*24)
         var resources:CGPDFDictionaryRef?,xObjects:CGPDFDictionaryRef?
@@ -115,6 +119,34 @@ final class CurveTests:XCTestCase {
         legacy.removeValue(forKey:"sceneSettings")
         try JSONSerialization.data(withJSONObject:legacy).write(to:folder.appendingPathComponent("legacy.braidart"))
         XCTAssertNil(try BraidProject.load(from:folder.appendingPathComponent("legacy.braidart")).sceneSettings)
+    }
+    func testPDFCancellationPreservesDestination() async throws {
+        let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:folder) }
+        let pdf=folder.appendingPathComponent("cancelled.pdf"),original=Data("existing file".utf8)
+        // Cancel at preparation, finalization and immediately before the atomic write.
+        for milestone in [0.0,0.9,0.97] {
+            for existing in [false,true] {
+                if existing { try original.write(to:pdf) }
+                let task=Task.detached {
+                    try CurveExporter.writePDF(braid,to:pdf) { value,_ in
+                        if value == milestone { withUnsafeCurrentTask { $0?.cancel() } }
+                    }
+                }
+                do { try await task.value;XCTFail("Expected cancellation at \(milestone)") }
+                catch is CancellationError {}
+                catch { XCTFail("Unexpected error: \(error)") }
+                if existing {
+                    XCTAssertEqual(try Data(contentsOf:pdf),original)
+                    try FileManager.default.removeItem(at:pdf)
+                } else { XCTAssertFalse(FileManager.default.fileExists(atPath:pdf.path)) }
+            }
+        }
+        // A later export still succeeds after a cancelled attempt.
+        try CurveExporter.writePDF(braid,to:pdf)
+        XCTAssertEqual(CGPDFDocument(pdf as CFURL)?.numberOfPages,1)
     }
     @MainActor func testMetalVisualizationAndCameraControls() throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
