@@ -34,7 +34,13 @@ locally signed, not notarized.
    view. Set the backing plane color and its clearance from the lowest tube.
    These settings are retained in the project. **Export Picture…** saves the
    current 3D view as a PNG, including its angle, zoom, pan, lighting and backing
-   plane, at the viewport’s current pixel resolution.
+   plane. Choose the output size in the save panel: current viewport, HD
+   (1280 × 720), Full HD (1920 × 1080), 4K UHD (3840 × 2160), or Instagram
+   square (1080 × 1080), portrait (1080 × 1350), tall portrait (1080 × 1440),
+   landscape (1080 × 566), and Story (1080 × 1920). Pictures are rendered at the
+   selected resolution after **Save**; a progress window includes **Cancel**.
+   The current framing fits inside the chosen aspect ratio without stretching
+   or cropping, with extra scene visible when the aspect ratio changes.
 6. **Export Vector PDF** writes a single page of filled strand contours with
    fine black outlines, edged underpass ends and no embedded images. Generation
    starts after you choose a destination and click **Save**. A progress window

@@ -148,6 +148,51 @@ final class CurveTests:XCTestCase {
         try CurveExporter.writePDF(braid,to:pdf)
         XCTAssertEqual(CGPDFDocument(pdf as CFURL)?.numberOfPages,1)
     }
+    @MainActor func testPictureExportPresetsAndNativeRendering() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
+        let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)
+        let view=BraidMetalView(frame:CGRect(x:0,y:0,width:1000,height:800))
+        view.display(braid,meshes:try TubeMesher.build(braid),settings:project.sceneSettings!)
+        view.orbit(dx:0.3,dy:-0.25);view.zoom(factor:0.9);view.pan(dx:15,dy:-10)
+        let transform=view.cameraNode.transform,fov=view.cameraNode.camera!.fieldOfView
+        let expected:[PictureExportSize:CGSize]=[
+            .viewport:view.viewportPixelSize,.hd:CGSize(width:1280,height:720),.fullHD:CGSize(width:1920,height:1080),
+            .ultraHD:CGSize(width:3840,height:2160),.instagramSquare:CGSize(width:1080,height:1080),
+            .instagramPortrait:CGSize(width:1080,height:1350),.instagramTallPortrait:CGSize(width:1080,height:1440),
+            .instagramLandscape:CGSize(width:1080,height:566),.instagramStory:CGSize(width:1080,height:1920)]
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:folder) }
+        for preset in PictureExportSize.allCases {
+            let size=preset.pixelSize(viewport:view.viewportPixelSize)
+            XCTAssertEqual(size,expected[preset])
+            let capture=try view.makePictureCapture(size:size)
+            let cg=try await Task.detached { try capture.render() }.value
+            XCTAssertEqual(cg.width,Int(size.width));XCTAssertEqual(cg.height,Int(size.height))
+            let url=folder.appendingPathComponent("\(preset.rawValue).png")
+            try ImageProcessor.writePNG(cg,to:url)
+            let source=try XCTUnwrap(CGImageSourceCreateWithURL(url as CFURL,nil))
+            let properties=try XCTUnwrap(CGImageSourceCopyPropertiesAtIndex(source,0,nil) as? [CFString:Any])
+            XCTAssertEqual(properties[kCGImagePropertyPixelWidth] as? Int,Int(size.width))
+            XCTAssertEqual(properties[kCGImagePropertyPixelHeight] as? Int,Int(size.height))
+            let thumbnail=try XCTUnwrap(CGImageSourceCreateThumbnailAtIndex(source,0,[kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:64] as CFDictionary))
+            XCTAssertGreaterThan(Set(try ImageProcessor.pixels(from:thumbnail).pixels).count,20,"Export must contain the lit scene")
+            XCTAssertTrue(SCNMatrix4EqualToMatrix4(view.cameraNode.transform,transform))
+            XCTAssertEqual(view.cameraNode.camera!.fieldOfView,fov)
+            XCTAssertEqual(view.bounds.size,CGSize(width:1000,height:800))
+        }
+        for invalid in [CGSize.zero,CGSize(width:3.5,height:500),CGSize(width:8193,height:1),CGSize(width:CGFloat.infinity,height:500)] {
+            XCTAssertThrowsError(try view.makePictureCapture(size:invalid))
+        }
+        // SwiftUI can lay out the viewport on fractional points; exports still use whole pixels.
+        view.setFrameSize(CGSize(width:1000.25,height:800.25))
+        let viewport=view.viewportPixelSize
+        XCTAssertEqual(viewport.width,viewport.width.rounded());XCTAssertEqual(viewport.height,viewport.height.rounded())
+        let frozen=try view.makePictureCapture(size:viewport)
+        view.scene=nil
+        let retained=try await Task.detached { try frozen.render() }.value
+        XCTAssertEqual(retained.width,Int(viewport.width));XCTAssertEqual(retained.height,Int(viewport.height))
+    }
     @MainActor func testMetalVisualizationAndCameraControls() throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
         let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)

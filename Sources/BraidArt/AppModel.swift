@@ -38,7 +38,7 @@ final class AppModel: ObservableObject {
     @Published var sceneSettings=SceneSettings()
     @Published var cameraReset=0
     @Published var obliqueCamera=false
-    @Published var pdfExport: PDFExportProgress?
+    @Published var exportProgress: ExportProgress?
     private weak var threeDView:BraidMetalView?
     private var sourceURL: URL?
     private var task: Task<Void,Never>?
@@ -46,7 +46,8 @@ final class AppModel: ObservableObject {
     private var preparedSettings: BraidCore.Settings?
     private var revision=0
     private var cachedTileData: TileData?
-    private var pdfSavePanel: NSSavePanel?
+    private var exportSavePanel: NSSavePanel?
+    private var pictureExportSize:PictureExportSize = .viewport
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? "CPU fallback" }
     var tileData: TileData { TileData(settings:settings) }
     var preparedIsCurrent: Bool { prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true }
@@ -143,7 +144,7 @@ final class AppModel: ObservableObject {
     }
     private func update(_ p: Double,_ message: String) { progress=p;status=message }
     func cancel() {
-        if let pdfExport { pdfExport.cancelling=true;pdfExport.message="Cancelling PDF export…" }
+        if let exportProgress { exportProgress.cancelling=true;exportProgress.message="Cancelling export…" }
         task?.cancel();previewTask?.cancel()
     }
     private func fail(_ err: Error) { busy=false;error=err.localizedDescription;status="Could not complete the operation." }
@@ -206,23 +207,56 @@ final class AppModel: ObservableObject {
     func resetCamera(oblique:Bool) { obliqueCamera=oblique;cameraReset+=1 }
     func register3DView(_ view:BraidMetalView) { threeDView=view }
     func export3DPicture() {
-        guard !busy,selectedTab==3,curves != nil,let view=threeDView,view.window != nil else { return }
-        do {
-            // Freeze exactly this framing before opening the save panel.
-            let image=try view.captureImage()
-            let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]
-            panel.message="Save the current 3D view (\(image.width) × \(image.height) pixels)."
-            guard panel.runModal() == .OK,let url=panel.url else { return }
-            runExport("Exporting 3D picture…",success:"Saved \(url.lastPathComponent)") { try ImageProcessor.writePNG(image,to:url) }
-        } catch { fail(error) }
+        guard !busy,exportSavePanel == nil,selectedTab==3,curves != nil,let view=threeDView,let window=view.window else { return }
+        let options=PictureExportOptions(size:pictureExportSize,viewport:view.viewportPixelSize)
+        let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]
+        panel.message="Export the current 3D picture."
+        let accessory=NSHostingView(rootView:PictureExportOptionsView(options:options))
+        accessory.setFrameSize(accessory.fittingSize);panel.accessoryView=accessory
+        exportSavePanel=panel
+        panel.beginSheetModal(for:window) { [weak self] response in
+            guard let self else { return }
+            self.exportSavePanel=nil
+            guard response == .OK,let url=panel.url,!self.busy else { return }
+            self.pictureExportSize=options.size
+            do { self.startPictureExport(try view.makePictureCapture(size:options.pixelSize),to:url) }
+            catch { self.fail(error) }
+        }
+    }
+    private func startPictureExport(_ capture:BraidPictureCapture,to url:URL) {
+        let export=ExportProgress(title:"Exporting 3D Picture",filename:url.lastPathComponent,message:"Rendering 3D picture…")
+        busy=true;progress=0;status="Exporting 3D picture…";exportProgress=export
+        task=Task {
+            do {
+                try await Task.detached(priority:.userInitiated) {
+                    let image=try capture.render()
+                    try Task.checkCancellation()
+                    DispatchQueue.main.async {
+                        guard !export.cancelling else { return }
+                        export.progress=0.8;export.message="Saving PNG…"
+                    }
+                    // Encode beside the destination, then commit only the complete image.
+                    let temporary=url.deletingLastPathComponent().appendingPathComponent(".braidart-\(UUID().uuidString).png")
+                    defer { try? FileManager.default.removeItem(at:temporary) }
+                    try ImageProcessor.writePNG(image,to:temporary)
+                    try Task.checkCancellation()
+                    try Data(contentsOf:temporary).write(to:url,options:.atomic)
+                }.valueWithCancellation()
+                exportProgress=nil;busy=false;progress=1;status="Saved \(url.lastPathComponent)"
+            } catch is CancellationError {
+                exportProgress=nil;busy=false;progress=0;status="Picture export cancelled."
+            } catch {
+                exportProgress=nil;fail(error)
+            }
+        }
     }
     func exportPDF() {
-        guard curves != nil,!busy,pdfSavePanel == nil else { return }
+        guard curves != nil,!busy,exportSavePanel == nil else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.pdf";panel.allowedContentTypes=[.pdf]
-        pdfSavePanel=panel
+        exportSavePanel=panel
         let completion: (NSApplication.ModalResponse)->Void = { [weak self] response in
             guard let self else { return }
-            self.pdfSavePanel=nil
+            self.exportSavePanel=nil
             guard response == .OK,let url=panel.url,let curves=self.curves,!self.busy else { return }
             self.startPDFExport(curves,to:url)
         }
@@ -230,8 +264,8 @@ final class AppModel: ObservableObject {
         else { panel.begin(completionHandler:completion) }
     }
     private func startPDFExport(_ curves:BraidCurves,to url:URL) {
-        let export=PDFExportProgress(filename:url.lastPathComponent)
-        busy=true;progress=0;status="Exporting vector PDF…";pdfExport=export
+        let export=ExportProgress(title:"Exporting PDF",filename:url.lastPathComponent,message:"Preparing vector PDF…")
+        busy=true;progress=0;status="Exporting vector PDF…";exportProgress=export
         task=Task {
             do {
                 try await Task.detached(priority:.userInitiated) {
@@ -242,11 +276,11 @@ final class AppModel: ObservableObject {
                         }
                     }
                 }.valueWithCancellation()
-                pdfExport=nil;busy=false;progress=1;status="Saved \(url.lastPathComponent)"
+                exportProgress=nil;busy=false;progress=1;status="Saved \(url.lastPathComponent)"
             } catch is CancellationError {
-                pdfExport=nil;busy=false;progress=0;status="PDF export cancelled."
+                exportProgress=nil;busy=false;progress=0;status="PDF export cancelled."
             } catch {
-                pdfExport=nil;fail(error)
+                exportProgress=nil;fail(error)
             }
         }
     }

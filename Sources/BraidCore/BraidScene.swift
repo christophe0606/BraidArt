@@ -51,6 +51,7 @@ public final class BraidMetalView: SCNView {
         antialiasingMode = .multisampling4X
         autoenablesDefaultLighting=false;allowsCameraControl=false
         cameraNode.camera=SCNCamera();cameraNode.camera!.fieldOfView=38
+        cameraNode.camera!.projectionDirection = .vertical
         cameraNode.camera!.wantsHDR=true;cameraNode.camera!.wantsExposureAdaptation=false
         cameraNode.camera!.exposureOffset = -0.35
     }
@@ -77,6 +78,35 @@ public final class BraidMetalView: SCNView {
             throw BraidError.invalid("Cannot capture the current 3D rendering.")
         }
         return cg
+    }
+    public var viewportPixelSize:CGSize {
+        let size=convertToBacking(bounds).size
+        return CGSize(width:size.width.rounded(),height:size.height.rounded())
+    }
+
+    /// Freeze an independent scene and camera for a background render at the requested pixel size.
+    public func makePictureCapture(size:CGSize) throws -> BraidPictureCapture {
+        guard let scene,let pointOfView,let sourceCamera=pointOfView.camera,bounds.width>0,bounds.height>0 else {
+            throw BraidError.invalid("Open a 3D rendering before exporting its picture.")
+        }
+        guard size.width.isFinite,size.height.isFinite,(1...8192).contains(size.width),(1...8192).contains(size.height),
+              size.width.rounded()==size.width,size.height.rounded()==size.height else {
+            throw BraidError.invalid("Picture dimensions must be whole pixels between 1 and 8192.")
+        }
+        SCNTransaction.flush()
+        let frozen=SCNScene()
+        frozen.background.contents=scene.background.contents
+        frozen.lightingEnvironment.contents=scene.lightingEnvironment.contents
+        frozen.lightingEnvironment.intensity=scene.lightingEnvironment.intensity
+        // Cloned nodes retain immutable mesh geometry; later viewport changes replace nodes/geometry.
+        for child in scene.rootNode.childNodes where child !== pointOfView { frozen.rootNode.addChildNode(child.clone()) }
+        let camera=SCNNode();camera.camera=sourceCamera.copy() as? SCNCamera
+        camera.transform=pointOfView.presentation.worldTransform
+        // Expand the field of view for narrower output, keeping the entire current framing.
+        let expansion=max(1,(bounds.width/bounds.height)/(size.width/size.height))
+        camera.camera!.fieldOfView=2*atan(tan(sourceCamera.fieldOfView*CGFloat.pi/360)*expansion)*180/CGFloat.pi
+        frozen.rootNode.addChildNode(camera)
+        return BraidPictureCapture(scene:frozen,camera:camera,size:size)
     }
     public func fit(columns:Int,rows:Int,oblique:Bool=false) {
         let aspect=Float(max(1,bounds.width)/max(1,bounds.height))
@@ -109,4 +139,26 @@ public final class BraidMetalView: SCNView {
     public override func otherMouseDragged(with event:NSEvent) { mouseDragged(with:event) }
     public override func scrollWheel(with event:NSEvent) { zoom(factor:exp(-min(80,max(-80,Float(event.scrollingDeltaY)))*0.01)) }
     public override func magnify(with event:NSEvent) { zoom(factor:exp(-Float(event.magnification))) }
+}
+
+/// Owns its frozen scene; rendering is serialized and never touches the live view.
+public final class BraidPictureCapture: @unchecked Sendable {
+    private let scene:SCNScene
+    private let camera:SCNNode
+    private let size:CGSize
+    private let lock=NSLock()
+    fileprivate init(scene:SCNScene,camera:SCNNode,size:CGSize) { self.scene=scene;self.camera=camera;self.size=size }
+    public func render() throws -> CGImage {
+        lock.lock();defer { lock.unlock() }
+        try Task.checkCancellation()
+        guard let device=MTLCreateSystemDefaultDevice() else { throw BraidError.invalid("Metal is unavailable for picture export.") }
+        let renderer=SCNRenderer(device:device,options:nil)
+        renderer.scene=scene;renderer.pointOfView=camera;renderer.autoenablesDefaultLighting=false
+        let image=renderer.snapshot(atTime:0,with:size,antialiasingMode:.multisampling4X)
+        try Task.checkCancellation()
+        guard let cg=image.cgImage(forProposedRect:nil,context:nil,hints:nil),cg.width==Int(size.width),cg.height==Int(size.height) else {
+            throw BraidError.invalid("Cannot render the selected picture size.")
+        }
+        return cg
+    }
 }

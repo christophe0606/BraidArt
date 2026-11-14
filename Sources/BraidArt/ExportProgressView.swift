@@ -1,23 +1,24 @@
 import SwiftUI
 
 @MainActor
-final class PDFExportProgress: ObservableObject, Identifiable {
+final class ExportProgress: ObservableObject, Identifiable {
     let id=UUID()
+    let title:String
     let filename:String
     @Published var progress=0.0
-    @Published var message="Preparing vector PDF…"
+    @Published var message:String
     @Published var cancelling=false
 
-    init(filename:String) { self.filename=filename }
+    init(title:String,filename:String,message:String) { self.title=title;self.filename=filename;self.message=message }
 }
 
-struct PDFExportView: View {
-    @ObservedObject var export:PDFExportProgress
+struct ExportProgressView: View {
+    @ObservedObject var export:ExportProgress
     let cancel:()->Void
 
     var body: some View {
         VStack(alignment:.leading,spacing:16) {
-            Text("Exporting PDF").font(.headline)
+            Text(export.title).font(.headline)
             Text(export.filename).foregroundStyle(.secondary).lineLimit(2)
             ProgressView(value:export.progress).tint(.orange)
             HStack {
