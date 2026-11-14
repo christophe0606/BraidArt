@@ -28,14 +28,14 @@ struct ContentView: View {
                     }
                     section("02", "Tiles & palette") {
                         ColorPicker("Background",selection:colorBinding(\.background),supportsOpacity:false)
-                        ForEach(model.settings.palette.indices,id:\.self) { index in
+                        ForEach(model.paletteEntries) { entry in
                             HStack {
-                                ColorPicker("Strand \(index+1)",selection:Binding(get:{model.settings.palette[index].color},set:{model.settings.palette[index]=RGB(color:$0)}),supportsOpacity:false)
-                                if model.settings.palette.count>1 { Button { model.settings.palette.remove(at:index) } label:{Image(systemName:"minus.circle")}.buttonStyle(.plain).foregroundStyle(.secondary).help("Remove strand color") }
+                                ColorPicker("Strand \(entry.index+1)",selection:model.paletteColorBinding(for:entry),supportsOpacity:false)
+                                if model.settings.palette.count>1 { Button { model.removePaletteColor(entry) } label:{Image(systemName:"minus.circle")}.buttonStyle(.plain).foregroundStyle(.secondary).help("Remove strand color") }
                             }
                         }
                         HStack {
-                            Button("Black & White") { model.settings.palette=[.black,.white] }
+                            Button("Black & White") { model.replacePalette([.black,.white]) }
                             Spacer()
                             Button { if model.settings.palette.count<8 { model.settings.palette.append(RGB(Double.random(in:0...1),Double.random(in:0...1),Double.random(in:0...1))) } } label:{Image(systemName:"plus")}.disabled(model.settings.palette.count>=8).help("Add strand color")
                         }
@@ -148,10 +148,10 @@ struct ContentView: View {
             VStack(alignment:.leading,spacing:22) {
                 title("The building blocks.",subtitle:"All color pairs, four geometries. IDs match the notebook’s tile order.")
                 LazyVGrid(columns:[GridItem(.adaptive(minimum:100),spacing:14)],spacing:20) {
-                    ForEach(Array(model.tileImages.enumerated()),id:\.offset) { index,image in
+                    ForEach(model.tilePreviews) { preview in
                         VStack(alignment:.leading,spacing:6) {
-                            Image(nsImage:image).resizable().interpolation(.high).aspectRatio(1,contentMode:.fit).clipShape(RoundedRectangle(cornerRadius:5))
-                            Text("\(index+1) · \(model.tileData.allTiles[index].kind.rawValue)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            Image(nsImage:preview.image).resizable().interpolation(.high).aspectRatio(1,contentMode:.fit).clipShape(RoundedRectangle(cornerRadius:5))
+                            Text("\(preview.tile.id) · \(preview.tile.kind.rawValue)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         }
                     }
                 }

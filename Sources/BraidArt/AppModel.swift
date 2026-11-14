@@ -13,16 +13,35 @@ extension RGB {
 }
 extension CGImage { var nsImage: NSImage { NSImage(cgImage:self,size:NSSize(width:width,height:height)) } }
 
+struct PaletteEntry: Identifiable {
+    let id: UUID
+    let index: Int
+    let color: RGB
+}
+
+struct TilePreview: Identifiable {
+    let tile: Tile
+    let image: NSImage
+    var id: Int { tile.id }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var settings=BraidCore.Settings()
+    @Published var settings=BraidCore.Settings() {
+        didSet {
+            // A resized palette must not reuse identities retained by old color pickers.
+            if paletteIDs.count != settings.palette.count {
+                paletteIDs=settings.palette.map { _ in UUID() }
+            }
+        }
+    }
     @Published var sourceImage: NSImage?
     @Published var sourceName=""
     @Published var prepared: PixelImage?
     @Published var preparedImage: NSImage?
     @Published var resultImage: NSImage?
     @Published var project: BraidProject?
-    @Published var tileImages: [NSImage]=[]
+    @Published private(set) var tilePreviews: [TilePreview]=[]
     @Published var busy=false
     @Published var status="Choose a picture to begin."
     @Published var progress=0.0
@@ -46,12 +65,37 @@ final class AppModel: ObservableObject {
     private var preparedSettings: BraidCore.Settings?
     private var revision=0
     private var cachedTileData: TileData?
+    private var paletteIDs=BraidCore.Settings().palette.map { _ in UUID() }
     private var exportSavePanel: NSSavePanel?
     private var pictureExportSize:PictureExportSize = .viewport
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? "CPU fallback" }
     var tileData: TileData { TileData(settings:settings) }
     var preparedIsCurrent: Bool { prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true }
     init() { refreshTiles() }
+
+    var paletteEntries: [PaletteEntry] {
+        zip(paletteIDs,settings.palette).enumerated().map { index,pair in
+            PaletteEntry(id:pair.0,index:index,color:pair.1)
+        }
+    }
+    func paletteColorBinding(for entry: PaletteEntry) -> Binding<Color> {
+        Binding(get: {
+            guard let index=self.paletteIDs.firstIndex(of:entry.id),self.settings.palette.indices.contains(index) else { return entry.color.color }
+            return self.settings.palette[index].color
+        },set: { color in
+            guard let index=self.paletteIDs.firstIndex(of:entry.id),self.settings.palette.indices.contains(index) else { return }
+            self.settings.palette[index]=RGB(color:color)
+        })
+    }
+    func removePaletteColor(_ entry: PaletteEntry) {
+        guard settings.palette.count>1,let index=paletteIDs.firstIndex(of:entry.id),settings.palette.indices.contains(index) else { return }
+        settings.palette.remove(at:index)
+    }
+    func replacePalette(_ palette: [RGB]) {
+        // Also invalidate old controls when replacement keeps the same number of colors.
+        paletteIDs=palette.map { _ in UUID() }
+        settings.palette=palette
+    }
 
     func chooseImage() {
         let panel=NSOpenPanel();panel.allowedContentTypes=[.image,.json,UTType(filenameExtension:"braidart") ?? .json];panel.allowsMultipleSelection=false
@@ -89,7 +133,10 @@ final class AppModel: ObservableObject {
         let data=tileData
         guard data != cachedTileData else { return }
         cachedTileData=data
-        tileImages=data.allTiles.compactMap{try? TileRenderer.tile($0,data:data,size:64).nsImage}
+        tilePreviews=data.allTiles.compactMap { tile in
+            guard let image=try? TileRenderer.tile(tile,data:data,size:64).nsImage else { return nil }
+            return TilePreview(tile:tile,image:image)
+        }
     }
     func prepare() {
         guard let url=sourceURL,!busy else { return }
@@ -110,7 +157,7 @@ final class AppModel: ObservableObject {
         busy=true;status="Finding dominant colors…";let count=paletteCount
         task=Task {
             let palette=await Task.detached{PaletteExtractor.dominantColors(in:image,count:count)}.value
-            settings.palette=palette;busy=false;status="Palette extracted. Edit its colors below."
+            replacePalette(palette);busy=false;status="Palette extracted. Edit its colors below."
             settingsChanged()
         }
     }
@@ -169,6 +216,7 @@ final class AppModel: ObservableObject {
                 let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
                 curves=generated;meshes=tubes;curveGeneration+=1
                 sceneSettings=loaded.sceneSettings ?? SceneSettings(planeColor:loaded.tileData.background)
+                paletteIDs=loaded.settings.palette.map { _ in UUID() }
                 sourceURL=nil;sourceImage=nil;sourceName=loaded.sourceName;settings=loaded.settings
                 prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).nsImage
                 project=loaded;resultImage=rendered.nsImage;refreshTiles();selectedTab=2;busy=false

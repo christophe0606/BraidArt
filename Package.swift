@@ -8,7 +8,8 @@ let package = Package(
     targets: [
         .target(name: "BraidCore", resources: [.copy("Resources/ColorCost.metal")]),
         .executableTarget(name: "BraidArt", dependencies: ["BraidCore"], resources: [.copy("Resources/AppIcon.icns")]),
-        .testTarget(name: "BraidCoreTests", dependencies: ["BraidCore"])
+        .testTarget(name: "BraidCoreTests", dependencies: ["BraidCore"]),
+        .testTarget(name: "BraidArtTests", dependencies: ["BraidArt", "BraidCore"])
     ],
     swiftLanguageModes: [.v5]
 )
