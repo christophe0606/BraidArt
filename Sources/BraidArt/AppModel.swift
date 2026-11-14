@@ -25,6 +25,20 @@ struct TilePreview: Identifiable {
     var id: Int { tile.id }
 }
 
+enum PaletteSeparation: String, CaseIterable, Identifiable {
+    case keepShades="Keep shades", low="Low", medium="Medium", high="High"
+    var id: Self { self }
+    // Practical presets, rather than universal boundaries between color names.
+    var minimumDistance: Double {
+        switch self {
+        case .keepShades: return 0
+        case .low: return 6
+        case .medium: return 12
+        case .high: return 20
+        }
+    }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var settings=BraidCore.Settings() {
@@ -48,7 +62,9 @@ final class AppModel: ObservableObject {
     @Published var error: String?
     @Published var solverURL=CBCRunner.discover()
     @Published var selectedTab=0
-    @Published var paletteCount=4
+    @Published var paletteCount=6
+    @Published var paletteSeparation=PaletteSeparation.medium
+    @Published var paletteIncludeAccents=true
     @Published var exportTileSize=50
     @Published var zoom=1.0
     @Published var curves: BraidCurves?
@@ -154,11 +170,20 @@ final class AppModel: ObservableObject {
     }
     func extractPalette() {
         guard let image=prepared,!busy else { return }
-        busy=true;status="Finding dominant colors…";let count=paletteCount
+        busy=true;status="Finding palette colors…";let count=paletteCount,separation=paletteSeparation.minimumDistance
+        let includeAccents=paletteIncludeAccents,url=sourceURL,snapshot=settings
         task=Task {
-            let palette=await Task.detached{PaletteExtractor.dominantColors(in:image,count:count)}.value
-            replacePalette(palette);busy=false;status="Palette extracted. Edit its colors below."
-            settingsChanged()
+            do {
+                let palette=try await Task.detached {
+                    if includeAccents {
+                        let detailed=try url.map { try ImageProcessor.preparePalette(url:$0,settings:snapshot) } ?? image
+                        return PaletteExtractor.distinctColors(in:detailed,count:count,minimumDistance:separation)
+                    }
+                    return PaletteExtractor.dominantColors(in:image,count:count,minimumDistance:separation)
+                }.value
+                replacePalette(palette);busy=false;status="Extracted \(palette.count) of up to \(count) colors. Edit the palette below."
+                settingsChanged()
+            } catch { fail(error) }
         }
     }
     func solve() {

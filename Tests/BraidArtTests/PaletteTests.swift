@@ -4,6 +4,41 @@ import BraidCore
 @testable import BraidArt
 
 final class PaletteTests: XCTestCase {
+    @MainActor func testAccentExtractionUsesSampledProjectWhenOriginalIsUnavailable() async throws {
+        let model=AppModel()
+        XCTAssertTrue(model.paletteIncludeAccents)
+        XCTAssertEqual(model.paletteCount,6)
+        let skin=RGB(0.76,0.60,0.53),blue=RGB(0.36,0.48,0.54),white=RGB(0.88,0.89,0.90)
+        let pixels=Array(repeating:skin,count:100)+Array(repeating:blue,count:2)+Array(repeating:white,count:2)
+        let image=PixelImage(width:104,height:1,pixels:pixels)
+        model.prepared=image
+        model.extractPalette()
+        let deadline=ContinuousClock.now.advanced(by:.seconds(5))
+        while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
+        XCTAssertFalse(model.busy)
+        XCTAssertEqual(model.settings.palette,PaletteExtractor.distinctColors(in:image,count:6))
+        XCTAssertEqual(model.settings.palette.count,3)
+    }
+
+    @MainActor func testExtractionUsesSelectedColorSeparation() async throws {
+        let model=AppModel()
+        XCTAssertEqual(model.paletteSeparation,.medium)
+        model.paletteCount=4
+        model.paletteIncludeAccents=false
+        let dark=RGB(0.45,0.45,0.45),light=RGB(0.55,0.55,0.55)
+        model.prepared=PixelImage(width:4,height:1,pixels:[dark,light,dark,light])
+        for separation in PaletteSeparation.allCases {
+            model.paletteSeparation=separation
+            model.extractPalette()
+            let deadline=ContinuousClock.now.advanced(by:.seconds(5))
+            while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
+            XCTAssertFalse(model.busy)
+            let expected=separation == .keepShades || separation == .low ? 2 : 1
+            XCTAssertEqual(model.settings.palette.count,expected)
+            XCTAssertTrue(model.status.contains("Extracted \(expected) of up to 4 colors"))
+        }
+    }
+
     @MainActor func testRetainedPickerAfterPaletteShrinksAndRegrows() async {
         let model=AppModel()
         model.replacePalette([.black,.white,RGB(1,0,0),RGB(0,1,0),RGB(0,0,1)])

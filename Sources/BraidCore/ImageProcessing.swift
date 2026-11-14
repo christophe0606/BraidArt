@@ -14,14 +14,28 @@ public enum ImageProcessor {
         return image
     }
     public static func prepare(url: URL, settings: Settings) throws -> PixelImage {
+        try prepare(url:url,settings:settings,forPalette:false)
+    }
+    /// A detailed sample of the same crop and adjustments, independent of tile
+    /// resolution, so small colored features remain available to palette extraction.
+    public static func preparePalette(url: URL, settings: Settings) throws -> PixelImage {
+        try prepare(url:url,settings:settings,forPalette:true)
+    }
+    private static func prepare(url: URL, settings: Settings, forPalette: Bool) throws -> PixelImage {
         try settings.validate()
         guard var image=CIImage(contentsOf:url,options:[.applyOrientationProperty:true]) else { throw BraidError.invalid("Cannot decode the selected image.") }
         let e=image.extent,c=settings.crop
         let rect=CGRect(x:e.minX+c.x*e.width,y:e.minY+(1-c.y-c.height)*e.height,width:c.width*e.width,height:c.height*e.height).integral.intersection(e)
         guard !rect.isEmpty else { throw BraidError.invalid("The crop is empty.") }
         image=image.cropped(to:rect).transformed(by:CGAffineTransform(translationX:-rect.minX,y:-rect.minY))
-        let width=settings.columns,height=max(1,Int((Double(width)*rect.height/rect.width).rounded()))
-        guard height<=256 else { throw BraidError.invalid("This crop would be taller than 256 tiles. Reduce the width or use a wider crop.") }
+        let width:Int,height:Int
+        if forPalette {
+            let scale=min(1,512/max(rect.width,rect.height))
+            width=max(1,Int((rect.width*scale).rounded()));height=max(1,Int((rect.height*scale).rounded()))
+        } else {
+            width=settings.columns;height=max(1,Int((Double(width)*rect.height/rect.width).rounded()))
+            guard height<=256 else { throw BraidError.invalid("This crop would be taller than 256 tiles. Reduce the width or use a wider crop.") }
+        }
         let bg=settings.alphaBackground
         image=image.composited(over:CIImage(color:CIColor(red:bg.r,green:bg.g,blue:bg.b)).cropped(to:image.extent))
         let controls=CIFilter.colorControls(); controls.inputImage=image; controls.contrast=Float(settings.contrast); controls.brightness=Float(settings.brightness)

@@ -40,9 +40,14 @@ struct ContentView: View {
                             Button { if model.settings.palette.count<8 { model.settings.palette.append(RGB(Double.random(in:0...1),Double.random(in:0...1),Double.random(in:0...1))) } } label:{Image(systemName:"plus")}.disabled(model.settings.palette.count>=8).help("Add strand color")
                         }
                         HStack {
-                            Stepper("\(model.paletteCount) colors",value:$model.paletteCount,in:2...8)
-                            Button("Extract",action:model.extractPalette).disabled(model.prepared==nil).help("Find dominant colors in the prepared picture")
+                            Stepper("Up to \(model.paletteCount) colors",value:$model.paletteCount,in:2...8)
+                            Button("Extract",action:model.extractPalette).disabled(model.prepared==nil).help("Find representative colors in the prepared picture")
                         }
+                        Picker("Color separation",selection:$model.paletteSeparation) {
+                            ForEach(PaletteSeparation.allCases) { separation in Text(separation.rawValue).tag(separation) }
+                        }.help("Higher separation merges more similar shades. Select Extract to apply it.")
+                        Toggle("Include small accents",isOn:$model.paletteIncludeAccents).help("Preserve distinct colors in small details using a more detailed sample of the crop. Turn off to favor the largest image regions.")
+                        Text("Higher separation avoids similar shades and may return fewer colors. Use 6–8 colors to include more details. Select Extract to apply.").font(.caption).foregroundStyle(.secondary)
                         Text("\(model.settings.palette.count*model.settings.palette.count*4) dark tiles · four strand geometries").font(.caption).foregroundStyle(.secondary)
                         DisclosureGroup("Strand geometry") {
                             VStack(spacing:8) {

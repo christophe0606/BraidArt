@@ -14,9 +14,20 @@ locally signed, not notarized.
 1. Choose **Open Image or Project**. Drag over the source to crop it; use **Reset
    Crop** to restore the full picture. Set the image width in tiles. The height
    follows the crop's aspect ratio, with a maximum of 256 tiles on either axis.
-2. Start with black and white strands over a gray background, or **Extract** two
-   to eight dominant colors from the sampled image. Edit any strand or the
-   background with its color picker. The tile library shows all `4 × colors²`
+2. Start with black and white strands over a gray background, or set a maximum
+   of two to eight colors and select **Extract** to find representative colors
+   in the cropped image. **Color separation** controls how similar shades are
+   combined: **Keep shades**, **Low**,
+   **Medium** (the default), or **High**. Higher separation may return fewer colors
+   than requested. **Include small accents** (on by default) selects colors by
+   perceptual diversity from a detailed sample of the crop, preserving small
+   features such as muted eye colors, highlights and lip colors. Turn it off to
+   favor the largest image regions. Use six to eight colors when several small
+   details matter; the default maximum is six. Extraction uses the same crop,
+   brightness, contrast and grayscale adjustments as the tile image. Projects
+   without the original picture use their saved sampled image. Select **Extract**
+   after changing these settings. Edit any strand
+   or the background with its color picker. The tile library shows all `4 × colors²`
    combinations. **Luminance only**, contrast, brightness and alpha compositing
    are applied before sampling.
 3. Click **Weave Image**. Parts are solved in the notebook's order with top and
