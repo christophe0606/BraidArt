@@ -16,6 +16,24 @@ public struct BlockProblem: Sendable {
 }
 
 public enum PartitionSolver {
+    /// CoinUtils 2.11.12 can mistake a continuation at an exact 1023-byte
+    /// boundary for EOF. Keep every LP line short, splitting only at whitespace
+    /// so coefficients, variable names and the mathematical model are unchanged.
+    private static func lpLines(_ line: String) -> [String] {
+        let limit=200
+        guard line.utf8.count>limit else { return [line] }
+        var result=[String](),current=" "
+        for token in line.split(whereSeparator:{$0.isWhitespace}) {
+            if current.utf8.count+1+token.utf8.count>limit {
+                result.append(current);current=" "
+            }
+            if current.count>1 { current.append(" ") }
+            current.append(contentsOf:token)
+        }
+        if current.count>1 { result.append(current) }
+        return result
+    }
+
     public static func makeProblem(block: Block, image: PixelImage, data: TileData, costs: CostTable,
                                    left: [Int]? = nil, top: [Int]? = nil) throws -> BlockProblem {
         guard block.width>0,block.height>0,block.x>=0,block.y>=0,block.x+block.width<=image.width,block.y+block.height<=image.height,
@@ -64,7 +82,7 @@ public enum PartitionSolver {
             seed[cell]=best.id
             for tile in data.allTiles { warm.append("\(cell*n+tile.id-1) \(v(cell,tile.id)) \(tile.id==best.id ? 1 : 0)") }
         }}
-        return BlockProblem(lp:lines.joined(separator:"\n")+"\n",warmStart:warm.joined(separator:"\n")+"\n",block:block,left:left,top:top)
+        return BlockProblem(lp:lines.flatMap(lpLines).joined(separator:"\n")+"\n",warmStart:warm.joined(separator:"\n")+"\n",block:block,left:left,top:top)
     }
     public static func parseSolution(_ text: String, problem: BlockProblem, data: TileData) throws -> (ids: [Int], optimal: Bool, status: String) {
         let lines=text.components(separatedBy:.newlines)

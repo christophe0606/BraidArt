@@ -66,6 +66,12 @@ column, then row-major interior. Remainder parts retain their actual dimensions.
 There is no outside border closure constraint, just as in the source notebook.
 Independent part optima do not constitute a global whole-image optimum.
 
+LP output uses continuation lines of at most 200 bytes for the objective,
+constraints and binary declarations. This avoids a CoinUtils 2.11.12 parser
+failure when a long physical line ends exactly at a 1023-byte buffer boundary.
+Only whitespace changes; all coefficients, tile choices and constraints remain
+the same.
+
 CBC receives a valid greedy incumbent, so an interactive time limit can still
 produce a usable integer solution. A time- or gap-limited incumbent is labeled
 feasible; a solution reported optimal within gap tolerance is not called proven

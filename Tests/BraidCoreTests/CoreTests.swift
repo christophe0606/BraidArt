@@ -132,6 +132,38 @@ final class CoreTests: XCTestCase {
         let (_,result)=try await PartitionSolver.solve(image:input,settings:settings,executable:solver())
         XCTAssertEqual(result.reports.count,9);try result.validate(tileData:data)
     }
+    func testCBCReadsFiveColorObjectiveAtReaderBufferBoundary() async throws {
+        var settings=Settings()
+        settings.palette=[.black,.white,RGB(1,0,0),RGB(0,1,0),RGB(0,0,1)]
+        settings.threads=1;settings.relativeGap=0;settings.secondsPerPartition=5
+        let input=image(1,1),data=TileData(settings:settings)
+        // These 100 coefficients produce a 2046-byte objective line in the old
+        // writer: exactly two 1023-byte input chunks in CoinUtils 2.11.12.
+        // CBC then reports "End inserted / Unable to read objective function".
+        let values=(0..<100).map { Float($0<46 ? 1 : 10) }
+        let costs=CostTable(values:values,tileCount:100,backend:"regression fixture")
+        let originalLine=data.allTiles.map { String(format:" + %.9f %@",locale:Locale(identifier:"en_US_POSIX"),costs[0,$0.id-1],"x0_\($0.id)") }.joined()
+        XCTAssertEqual(originalLine.utf8.count,2046)
+        let problem=try PartitionSolver.makeProblem(block:Block(x:0,y:0,width:1,height:1),image:input,data:data,costs:costs)
+        let text=try await CBCRunner.solve(problem:problem,executable:solver(),settings:settings)
+        let parsed=try PartitionSolver.parseSolution(text,problem:problem,data:data)
+        XCTAssertEqual(parsed.ids.count,1)
+        XCTAssertEqual(costs[0,parsed.ids[0]-1],1)
+        XCTAssertTrue(parsed.optimal)
+    }
+    func testCBCReadsMaximumPaletteWithBothIncomingBoundaries() async throws {
+        var settings=Settings()
+        settings.palette=[.black,.white,RGB(1,0,0),RGB(0,1,0),RGB(0,0,1),RGB(1,1,0),RGB(0,1,1),RGB(1,0,1)]
+        settings.threads=1;settings.relativeGap=0;settings.secondsPerPartition=5
+        let input=image(2,2),data=TileData(settings:settings)
+        let costs=CostTable(values:Array(repeating:Float(1),count:4*256),tileCount:256,backend:"regression fixture")
+        let left=[1,1],top=[1,1]
+        let problem=try PartitionSolver.makeProblem(block:Block(x:0,y:0,width:2,height:2),image:input,data:data,costs:costs,left:left,top:top)
+        let text=try await CBCRunner.solve(problem:problem,executable:solver(),settings:settings)
+        let parsed=try PartitionSolver.parseSolution(text,problem:problem,data:data)
+        XCTAssertEqual(parsed.ids.count,4)
+        XCTAssertTrue(parsed.optimal)
+    }
     func testCancellationStopsChildAndCleansFiles() async throws {
         let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
