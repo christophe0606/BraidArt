@@ -148,6 +148,42 @@ final class CurveTests:XCTestCase {
         try CurveExporter.writePDF(braid,to:pdf)
         XCTAssertEqual(CGPDFDocument(pdf as CFURL)?.numberOfPages,1)
     }
+    @MainActor func testPictureExportKeepsCurrentCameraAcrossAspectRatios() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
+        let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)
+        let view=BraidMetalView(frame:CGRect(x:0,y:0,width:1000,height:800))
+        view.display(braid,meshes:try TubeMesher.build(braid),settings:project.sceneSettings!)
+        let referenceSize=CGSize(width:1000,height:800)
+        let initial=try view.makePictureCapture()
+        let before=try await Task.detached { try initial.render(size:referenceSize) }.value
+        func difference(_ a:CGImage,_ b:CGImage) throws -> Double {
+            let ap=try ImageProcessor.pixels(from:a),bp=try ImageProcessor.pixels(from:b)
+            XCTAssertEqual(ap.width,bp.width);XCTAssertEqual(ap.height,bp.height)
+            return zip(ap.pixels,bp.pixels).reduce(0) { $0+abs($1.0.r-$1.1.r)+abs($1.0.g-$1.1.g)+abs($1.0.b-$1.1.b) }/Double(ap.pixels.count*3)
+        }
+        view.orbit(dx:0.4,dy:-0.25)
+        let rotated=try view.makePictureCapture()
+        let rotation=try await Task.detached { try rotated.render(size:referenceSize) }.value
+        XCTAssertGreaterThan(try difference(before,rotation),0.03,"Export must reflect rotation")
+        view.zoom(factor:0.65)
+        let zoomed=try view.makePictureCapture()
+        let zoom=try await Task.detached { try zoomed.render(size:referenceSize) }.value
+        XCTAssertGreaterThan(try difference(rotation,zoom),0.03,"Export must reflect zoom")
+        view.pan(dx:100,dy:-45)
+        let current=try view.makePictureCapture()
+        let after=try await Task.detached { try current.render(size:referenceSize) }.value
+        XCTAssertGreaterThan(try difference(zoom,after),0.03,"Export must reflect pan")
+        // Later viewport changes cannot affect the camera frozen before the save panel.
+        view.fit(columns:braid.columns,rows:braid.rows)
+        let frozen=try await Task.detached { try current.render(size:referenceSize) }.value
+        XCTAssertLessThan(try difference(after,frozen),0.01)
+        // With the same height, changing aspect ratio must crop the sides, preserving zoom.
+        for width in [800,450] {
+            let image=try await Task.detached { try current.render(size:CGSize(width:width,height:800)) }.value
+            let crop=try XCTUnwrap(after.cropping(to:CGRect(x:(1000-width)/2,y:0,width:width,height:800)))
+            XCTAssertLessThan(try difference(crop,image),0.01,"Changing output shape must not zoom out")
+        }
+    }
     @MainActor func testPictureExportPresetsAndNativeRendering() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
         let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)

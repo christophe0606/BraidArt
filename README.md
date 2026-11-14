@@ -39,8 +39,9 @@ locally signed, not notarized.
    square (1080 × 1080), portrait (1080 × 1350), tall portrait (1080 × 1440),
    landscape (1080 × 566), and Story (1080 × 1920). Pictures are rendered at the
    selected resolution after **Save**; a progress window includes **Cancel**.
-   The current framing fits inside the chosen aspect ratio without stretching
-   or cropping, with extra scene visible when the aspect ratio changes.
+   The camera is frozen when you open the export panel, preserving your zoom,
+   rotation, pan and field of view. A different output aspect ratio crops or
+   extends the visible area at the sides without changing the camera.
 6. **Export Vector PDF** writes a single page of filled strand contours with
    fine black outlines, edged underpass ends and no embedded images. Generation
    starts after you choose a destination and click **Save**. A progress window

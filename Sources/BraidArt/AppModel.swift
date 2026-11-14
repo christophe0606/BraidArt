@@ -208,6 +208,9 @@ final class AppModel: ObservableObject {
     func register3DView(_ view:BraidMetalView) { threeDView=view }
     func export3DPicture() {
         guard !busy,exportSavePanel == nil,selectedTab==3,curves != nil,let view=threeDView,let window=view.window else { return }
+        let capture:BraidPictureCapture
+        do { capture=try view.makePictureCapture() }
+        catch { fail(error);return }
         let options=PictureExportOptions(size:pictureExportSize,viewport:view.viewportPixelSize)
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]
         panel.message="Export the current 3D picture."
@@ -219,17 +222,16 @@ final class AppModel: ObservableObject {
             self.exportSavePanel=nil
             guard response == .OK,let url=panel.url,!self.busy else { return }
             self.pictureExportSize=options.size
-            do { self.startPictureExport(try view.makePictureCapture(size:options.pixelSize),to:url) }
-            catch { self.fail(error) }
+            self.startPictureExport(capture,size:options.pixelSize,to:url)
         }
     }
-    private func startPictureExport(_ capture:BraidPictureCapture,to url:URL) {
+    private func startPictureExport(_ capture:BraidPictureCapture,size:CGSize,to url:URL) {
         let export=ExportProgress(title:"Exporting 3D Picture",filename:url.lastPathComponent,message:"Rendering 3D picture…")
         busy=true;progress=0;status="Exporting 3D picture…";exportProgress=export
         task=Task {
             do {
                 try await Task.detached(priority:.userInitiated) {
-                    let image=try capture.render()
+                    let image=try capture.render(size:size)
                     try Task.checkCancellation()
                     DispatchQueue.main.async {
                         guard !export.cancelling else { return }

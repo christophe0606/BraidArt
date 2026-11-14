@@ -85,14 +85,12 @@ public final class BraidMetalView: SCNView {
     }
 
     /// Freeze an independent scene and camera for a background render at the requested pixel size.
-    public func makePictureCapture(size:CGSize) throws -> BraidPictureCapture {
+    public func makePictureCapture(size:CGSize? = nil) throws -> BraidPictureCapture {
         guard let scene,let pointOfView,let sourceCamera=pointOfView.camera,bounds.width>0,bounds.height>0 else {
             throw BraidError.invalid("Open a 3D rendering before exporting its picture.")
         }
-        guard size.width.isFinite,size.height.isFinite,(1...8192).contains(size.width),(1...8192).contains(size.height),
-              size.width.rounded()==size.width,size.height.rounded()==size.height else {
-            throw BraidError.invalid("Picture dimensions must be whole pixels between 1 and 8192.")
-        }
+        let size=size ?? viewportPixelSize
+        try BraidPictureCapture.validate(size:size)
         SCNTransaction.flush()
         let frozen=SCNScene()
         frozen.background.contents=scene.background.contents
@@ -101,10 +99,9 @@ public final class BraidMetalView: SCNView {
         // Cloned nodes retain immutable mesh geometry; later viewport changes replace nodes/geometry.
         for child in scene.rootNode.childNodes where child !== pointOfView { frozen.rootNode.addChildNode(child.clone()) }
         let camera=SCNNode();camera.camera=sourceCamera.copy() as? SCNCamera
-        camera.transform=pointOfView.presentation.worldTransform
-        // Expand the field of view for narrower output, keeping the entire current framing.
-        let expansion=max(1,(bounds.width/bounds.height)/(size.width/size.height))
-        camera.camera!.fieldOfView=2*atan(tan(sourceCamera.fieldOfView*CGFloat.pi/360)*expansion)*180/CGFloat.pi
+        // Explicit camera controls update the model transform immediately. Presentation
+        // transforms may still describe an earlier rendered frame when export is clicked.
+        camera.transform=pointOfView.worldTransform
         frozen.rootNode.addChildNode(camera)
         return BraidPictureCapture(scene:frozen,camera:camera,size:size)
     }
@@ -148,9 +145,17 @@ public final class BraidPictureCapture: @unchecked Sendable {
     private let size:CGSize
     private let lock=NSLock()
     fileprivate init(scene:SCNScene,camera:SCNNode,size:CGSize) { self.scene=scene;self.camera=camera;self.size=size }
-    public func render() throws -> CGImage {
+    fileprivate static func validate(size:CGSize) throws {
+        guard size.width.isFinite,size.height.isFinite,(1...8192).contains(size.width),(1...8192).contains(size.height),
+              size.width.rounded()==size.width,size.height.rounded()==size.height else {
+            throw BraidError.invalid("Picture dimensions must be whole pixels between 1 and 8192.")
+        }
+    }
+    public func render(size:CGSize? = nil) throws -> CGImage {
         lock.lock();defer { lock.unlock() }
         try Task.checkCancellation()
+        let size=size ?? self.size
+        try Self.validate(size:size)
         guard let device=MTLCreateSystemDefaultDevice() else { throw BraidError.invalid("Metal is unavailable for picture export.") }
         let renderer=SCNRenderer(device:device,options:nil)
         renderer.scene=scene;renderer.pointOfView=camera;renderer.autoenablesDefaultLighting=false

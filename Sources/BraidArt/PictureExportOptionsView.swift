@@ -18,7 +18,7 @@ struct PictureExportOptionsView: View {
             }
             Text("\(Int(options.pixelSize.width)) × \(Int(options.pixelSize.height)) pixels · PNG")
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            Text("Keeps the camera angle and fits the current framing without cropping or stretching. Rendering starts after Save.")
+            Text("Keeps your current zoom, rotation and pan. The output shape changes the visible area at the sides. Rendering starts after Save.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
         }.padding(12).frame(width:460)
     }
