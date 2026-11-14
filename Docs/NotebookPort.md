@@ -20,8 +20,10 @@ the original copied notebook, not extracted Wolfram source.
 
 `3DBraids.nb` lines 1761–1801 use the same dark-tile solve, with part size 7.
 Lines 24090 onward save `solution` and `tileData` before the different subsequent
-curve pipeline. This app stops at that boundary. `Braids.js` is retained solely
-as original material; no integration or curve-file generation is attempted.
+curve pipeline. `Curves.swift` now traces the two pieces per tile across matching
+edges, starting with boundary paths and then closed loops. It uses an iterative
+walk, including paths that revisit a tile through its other strand. GLB is the
+3D interchange format. `Braids.js` remains unmodified historical material.
 `Tools/extract_notebook.py` is a read-only aid for extracting textual input boxes;
 it is not a Wolfram evaluator or a general notebook converter.
 
@@ -115,3 +117,61 @@ stored in the repository.
 - [Wolfram ColorConvert white points](https://reference.wolfram.com/language/ref/ColorConvert.html)
 - [COIN-OR CBC](https://github.com/coin-or/Cbc)
 - [Sharma–Wu–Dalal CIEDE2000 implementation notes and reference data](https://hajim.rochester.edu/ece/sites/gsharma/ciede2000/)
+
+## Curves, PDF and 3D
+
+`3DBraids.nb` defines `analyzeTile` at line 86, tracing at 24153, quarter-circle
+Béziers at 25139, crossing controls at 25324, spline conversion at 25552, the
+stream writer at 26876 and “Generate file” calls at 27229–27238. Native curves preserve open
+ends, loop closure and palette indices. Coordinates use the notebook convention:
+tile centers start at (1,-1,0), XY is the image plane and positive Z faces the
+viewer. Corner arcs have radius 1/2 and cubic factor `4(sqrt(2)-1)/3`.
+
+The notebook’s eight crossing controls form two cubic segments. Their Z values
+are scaled so the midpoint height is `max(0.3353863185193847, 1.1*strandWidth)`;
+XY controls retain their original values. This differs deliberately from the
+old Blender importer’s fixed radius of 0.207107−0.05 and Z offset of −0.05.
+Native 3D tubes use radius `strandWidth/2`, with smooth vertex normals and capped
+open ends. The same tessellation is used for Metal and GLB. Default sampling is 16 radial
+sides and 16 steps per cubic; large grids reduce this to 10/8 above 4096 tiles
+and 8/4 above 16384 tiles to bound memory use. This is a visual
+mesh, not a guaranteed intersection-free CAD solid for arbitrary tile settings.
+Analytic curves are regenerated from the saved project’s tiling when opened.
+
+Vector PDF projects the generated curves into XY. Raised pieces project to
+straight lines. Underpasses are split using the configured crossing gap, and
+each visible strand is expanded into a filled vector contour with a fine black
+outline, 0.02 tile wide. The outside strand width is preserved by insetting the
+outline center. Exposed cut ends are outlined too. Connected pieces and closed
+loops remain continuous across tile boundaries and the tracing origin. The PDF
+background is the solved tile background; the independently editable backing
+plane belongs to 3D. A tile spans 24 PDF points and the page follows the tiling’s
+aspect ratio. The PDF uses no bitmap drawing or embedded image resources.
+
+`BraidMetalView` is an SCNView explicitly configured with the Metal renderer.
+It displays indexed tube geometry with PBR materials, directional lights and
+shadows, an ambient fill and a backing plane. Clearance is the distance from
+the lowest strand surface to the plane, so its Z is `−strandWidth/2−clearance`.
+Camera fit, orbit, pan and zoom act on the camera, leaving exported geometry
+unchanged. Plane settings are optional in version-1 projects for backward
+compatibility; old projects default to their tile background and 0.15 clearance.
+
+The 3D workspace’s Export Picture action snapshots the live Metal view and writes
+a lossless PNG at its current pixel resolution. Camera framing, aspect ratio,
+lights, shadows and backing plane are retained, without the surrounding app UI.
+The capture is frozen before the save panel opens and does not reset the camera.
+
+GLB stores triangles, normals and materials with no external files. sRGB colors
+are converted to linear RGB for glTF base-color factors. It retains geometry
+and color. Import it directly in Blender using File → Import → glTF 2.0;
+no separate curve export or importer script is needed. The imported strands
+are triangle meshes.
+
+Validation covers all four tile kinds, mixed-color seams, reversed paths, closed
+loops, paired triangle edges and normalized normals,
+GLB chunks/materials, old/new project loading and PDF image-resource absence.
+A Metal snapshot test renders real geometry and exercises camera and plane
+updates. PDF output is also rendered with Poppler and checked with `pdfimages`.
+Blender has deliberately not been run.
+
+Format reference: [glTF 2.0 specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html).

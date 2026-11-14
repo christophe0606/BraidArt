@@ -76,6 +76,8 @@ struct ContentView: View {
                         }
                         Button("Save Project…",action:model.saveProject).disabled(model.project==nil)
                         Button("Export PNG…",action:model.exportPNG).disabled(model.project==nil)
+                        Button("Export Vector PDF…",action:model.exportPDF).disabled(model.curves==nil)
+                        Button("Export 3D Object (GLB)…",action:model.exportGLB).disabled(model.curves==nil)
                         Button("Export Solution & Tile Data…",action:model.exportData).disabled(model.project==nil)
                         Text("Data export includes JSON, Wolfram data and tile images for subsequent processing.").font(.caption).foregroundStyle(.secondary)
                     }
@@ -85,8 +87,8 @@ struct ContentView: View {
             VStack(spacing:0) {
                 HStack {
                     Picker("Workspace",selection:$model.selectedTab) {
-                        Text("Prepare").tag(0);Text("Tile Library").tag(1);Text("Result").tag(2)
-                    }.pickerStyle(.segmented).frame(width:320)
+                        Text("Prepare").tag(0);Text("Tile Library").tag(1);Text("Result").tag(2);Text("3D").tag(3)
+                    }.pickerStyle(.segmented).frame(width:380)
                     Spacer()
                     if model.busy {
                         Button("Cancel",role:.cancel,action:model.cancel)
@@ -100,6 +102,7 @@ struct ContentView: View {
                     switch model.selectedTab {
                     case 0: prepareWorkspace
                     case 1: tileLibrary
+                    case 3: threeDWorkspace
                     default: resultWorkspace
                     }
                 }.frame(maxWidth:.infinity,maxHeight:.infinity)
@@ -115,6 +118,7 @@ struct ContentView: View {
                 }.padding(14).background(.bar)
             }.frame(minWidth:700)
         }
+        .onChange(of:model.sceneSettings) { _,_ in model.sceneSettingsChanged() }
         .onChange(of:model.settings) { _,_ in model.settingsChanged() }
         .alert("BraidArt",isPresented:Binding(get:{model.error != nil},set:{if !$0 {model.error=nil}})) { Button("OK") { model.error=nil } } message:{Text(model.error ?? "")}
     }
@@ -182,6 +186,36 @@ struct ContentView: View {
                 }.padding(16)
             } else {
                 emptyState(symbol:"square.grid.3x3",title:model.busy ? "Weaving your image" : "Ready to weave",detail:model.busy ? "Each part is solved with strand continuity constraints. Progress appears below." : "Prepare a picture and choose your palette, then select Weave Image.",button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)
+            }
+        }
+    }
+    private var threeDWorkspace: some View {
+        VStack(spacing:0) {
+            if let braid=model.curves {
+                HStack {
+                    VStack(alignment:.leading,spacing:4) {
+                        Text("The woven sculpture").font(.title2.weight(.semibold))
+                        Text("\(braid.curves.count) curves · Metal · drag to rotate, Shift-drag or right-drag to pan, scroll or pinch to zoom").font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Front / Fit") { model.resetCamera(oblique:false) }
+                    Button("Perspective") { model.resetCamera(oblique:true) }
+                    Button("Export Picture…",action:model.export3DPicture).disabled(model.busy)
+                }.padding(20)
+                HStack(spacing:20) {
+                    ColorPicker("Backing plane",selection:Binding(get:{model.sceneSettings.planeColor.color},set:{model.sceneSettings.planeColor=RGB(color:$0)}),supportsOpacity:false).frame(maxWidth:230)
+                    Text("Clearance").font(.caption)
+                    Slider(value:$model.sceneSettings.planeDistance,in:0...3).frame(maxWidth:180)
+                    Text(String(format:"%.2f tiles",model.sceneSettings.planeDistance)).font(.caption.monospacedDigit()).frame(width:75)
+                    Spacer()
+                }.padding(.horizontal,20).padding(.bottom,16)
+                if let project=model.project,project.settings != model.settings {
+                    Label("Showing the previous result. Weave again to apply the current settings.",systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).padding(.bottom,12)
+                }
+                Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,onViewReady:model.register3DView)
+                Text("Plane clearance is measured from the back of the lowest strand. Plane settings are saved with the project and 3D exports.").font(.caption).foregroundStyle(.secondary).padding(14)
+            } else {
+                emptyState(symbol:"cube.transparent",title:"Curves become a sculpture",detail:"Weave an image or open a saved project to inspect its connected strands in 3D.",button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)
             }
         }
     }

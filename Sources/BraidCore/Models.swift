@@ -161,6 +161,7 @@ public struct SolveResult: Codable, Equatable, Sendable {
 }
 
 public struct BraidProject: Codable, Sendable {
+    public var sceneSettings: SceneSettings? = nil
     public var formatVersion = 1
     public var createdAt = Date()
     public var sourceName: String
@@ -173,7 +174,7 @@ public struct BraidProject: Codable, Sendable {
     }
     public func validate() throws {
         guard formatVersion == 1 else { throw BraidError.invalid("Unsupported project format version.") }
-        try settings.validate(); try sampledImage.validate()
+        try settings.validate(); try sampledImage.validate(); try sceneSettings?.validate()
         guard tileData == TileData(settings: settings), sampledImage.width == result.solution.first?.count,
               sampledImage.height == result.solution.count else { throw BraidError.invalid("Project tile data does not match its settings or sampled image.") }
         try result.validate(tileData: tileData)

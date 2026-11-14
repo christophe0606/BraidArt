@@ -21,6 +21,9 @@ struct BraidArtApp: App {
             }
             CommandGroup(after:.importExport) {
                 Button("Export Result as PNG…") { model.exportPNG() }.disabled(model.project == nil || model.busy)
+                Button("Export 3D View as PNG…") { model.export3DPicture() }.disabled(model.selectedTab != 3 || model.curves == nil || model.busy)
+                Button("Export Vector PDF…") { model.exportPDF() }.disabled(model.curves == nil || model.busy)
+                Button("Export 3D Object (GLB)…") { model.exportGLB() }.disabled(model.curves == nil || model.busy)
                 Button("Export Solution and Tile Data…") { model.exportData() }.disabled(model.project == nil || model.busy)
             }
         }

@@ -32,6 +32,13 @@ final class AppModel: ObservableObject {
     @Published var paletteCount=4
     @Published var exportTileSize=50
     @Published var zoom=1.0
+    @Published var curves: BraidCurves?
+    @Published var meshes: [TubeMesh]=[]
+    @Published var curveGeneration=0
+    @Published var sceneSettings=SceneSettings()
+    @Published var cameraReset=0
+    @Published var obliqueCamera=false
+    private weak var threeDView:BraidMetalView?
     private var sourceURL: URL?
     private var task: Task<Void,Never>?
     private var previewTask: Task<Void,Never>?
@@ -57,7 +64,7 @@ final class AppModel: ObservableObject {
                 let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.value
                 guard rev==revision else { return }
                 sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.nsImage;settings.crop=Crop()
-                prepared=nil;preparedImage=nil;project=nil;resultImage=nil;selectedTab=0;busy=false
+                prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];selectedTab=0;busy=false
                 prepare()
             } catch { fail(error) }
         }
@@ -119,7 +126,12 @@ final class AppModel: ObservableObject {
                 try Task.checkCancellation()
                 let result=output.1,data=output.0
                 let rendered=try await Task.detached{try TileRenderer.render(solution:result.solution,data:data,tileSize:min(40,max(8,3200/max(image.width,image.height))))}.value
+                let generated=try await Task.detached { try CurveGenerator.generate(solution:result.solution,data:data) }.value
+                let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
+                curves=generated;meshes=tubes;curveGeneration+=1
+                sceneSettings=SceneSettings(planeColor:data.background)
                 project=BraidProject(sourceName:name,settings:snapshot,sampledImage:image,tileData:data,result:result)
+                project?.sceneSettings=sceneSettings
                 resultImage=rendered.nsImage;zoom=1;busy=false;progress=1
                 let quality=result.allPartitionsOptimal ? "Every part proven optimal" : "Feasible result · some parts reached the time or gap limit"
                 status="\(quality) · \(String(format:"%.1f",result.elapsedSeconds)) s"
@@ -147,6 +159,10 @@ final class AppModel: ObservableObject {
             do {
                 let loaded=try await Task.detached { try BraidProject.load(from:url) }.value
                 let rendered=try await Task.detached{try TileRenderer.render(solution:loaded.result.solution,data:loaded.tileData,tileSize:min(40,max(8,3200/max(loaded.sampledImage.width,loaded.sampledImage.height))))}.value
+                let generated=try await Task.detached { try CurveGenerator.generate(solution:loaded.result.solution,data:loaded.tileData) }.value
+                let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
+                curves=generated;meshes=tubes;curveGeneration+=1
+                sceneSettings=loaded.sceneSettings ?? SceneSettings(planeColor:loaded.tileData.background)
                 sourceURL=nil;sourceImage=nil;sourceName=loaded.sourceName;settings=loaded.settings
                 prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).nsImage
                 project=loaded;resultImage=rendered.nsImage;refreshTiles();selectedTab=2;busy=false
@@ -179,6 +195,40 @@ final class AppModel: ObservableObject {
                 try await Task.detached { try ProjectExporter.export(project,to:destination,tileSize:size) }.value
                 busy=false;status="Exported \(destination.lastPathComponent)";NSWorkspace.shared.activateFileViewerSelecting([destination])
             } catch { fail(error) }
+        }
+    }
+    func sceneSettingsChanged() { project?.sceneSettings=sceneSettings }
+    func resetCamera(oblique:Bool) { obliqueCamera=oblique;cameraReset+=1 }
+    func register3DView(_ view:BraidMetalView) { threeDView=view }
+    func export3DPicture() {
+        guard !busy,selectedTab==3,curves != nil,let view=threeDView,view.window != nil else { return }
+        do {
+            // Freeze exactly this framing before opening the save panel.
+            let image=try view.captureImage()
+            let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]
+            panel.message="Save the current 3D view (\(image.width) × \(image.height) pixels)."
+            guard panel.runModal() == .OK,let url=panel.url else { return }
+            runExport("Exporting 3D picture…",success:"Saved \(url.lastPathComponent)") { try ImageProcessor.writePNG(image,to:url) }
+        } catch { fail(error) }
+    }
+    func exportPDF() {
+        guard let curves,!busy else { return }
+        let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.pdf";panel.allowedContentTypes=[.pdf]
+        guard panel.runModal() == .OK,let url=panel.url else { return }
+        runExport("Exporting vector PDF…",success:"Saved \(url.lastPathComponent)") { try CurveExporter.writePDF(curves,to:url) }
+    }
+    func exportGLB() {
+        guard let curves,!busy else { return }
+        let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.glb";panel.allowedContentTypes=[UTType(filenameExtension:"glb") ?? .data]
+        guard panel.runModal() == .OK,let url=panel.url else { return }
+        let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
+        runExport("Exporting colored 3D object…",success:"Saved \(url.lastPathComponent)") { try GLBExporter.write(meshes:all,to:url) }
+    }
+    private func runExport(_ message:String,success:String,operation:@escaping @Sendable () throws -> Void) {
+        busy=true;status=message
+        task=Task {
+            do { try await Task.detached(priority:.userInitiated) { try operation() }.value;busy=false;status=success }
+            catch { fail(error) }
         }
     }
     private var baseName: String { (sourceName as NSString).deletingPathExtension.isEmpty ? "BraidArt" : (sourceName as NSString).deletingPathExtension }

@@ -1,7 +1,7 @@
 # BraidArt for macOS
 
 A native SwiftUI app for the image-to-dark-tile pipeline in
-`TilingAndConstraints.nb` and the initial image stage of `3DBraids.nb`.
+`TilingAndConstraints.nb` and the curve generation pipeline in `3DBraids.nb`.
 Requires macOS 14 or later. The locally built app targets Apple Silicon;
 building on an Intel Mac produces an Intel app and solver.
 
@@ -28,6 +28,20 @@ locally signed, not notarized.
    & Tile Data** creates a self-contained folder of JSON, Wolfram data and tile
    PNGs. The export dialog chooses a parent directory and creates a fresh child
    folder without overwriting an earlier export.
+5. Open **3D** to view continuous, colored tube meshes rendered through Metal.
+   Drag to rotate; Shift-drag, right-drag or middle-drag to pan; scroll or pinch
+   to zoom. **Front / Fit** resets the camera; **Perspective** gives an angled
+   view. Set the backing plane color and its clearance from the lowest tube.
+   These settings are retained in the project. **Export Picture…** saves the
+   current 3D view as a PNG, including its angle, zoom, pan, lighting and backing
+   plane, at the viewport’s current pixel resolution.
+6. **Export Vector PDF** writes a single page of filled strand contours with
+   fine black outlines, edged underpass ends and no embedded images. **Export 3D Object
+   (GLB)** saves the same tube meshes and backing plane with normals and colored
+   PBR materials in a self-contained glTF 2.0 file.
+   Import the GLB directly in Blender using **File → Import → glTF 2.0**.
+   It contains the strand geometry, backing plane and material colors; no script
+   is required.
 
 A saved project retains the exact sampled image, complete tile definitions,
 settings, solution and per-part solver reports. Reopen it to change the palette,
@@ -81,7 +95,8 @@ a standalone Finder bundle with native document opening, menus and local signing
 
 See [Docs/NotebookPort.md](Docs/NotebookPort.md) for equations, source locations
 and practical limits. The original notebooks and JavaScript are untouched.
-The later curve generation, “generate file” and Blender stages are not implemented.
+Curve tracing, Bézier generation, vector PDF, Metal visualization and GLB export
+are implemented. Blender itself has not been launched or tested.
 
 ## License
 
