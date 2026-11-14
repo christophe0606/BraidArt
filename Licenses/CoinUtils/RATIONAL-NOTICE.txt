@@ -1,0 +1,22 @@
+// Authors: Matthew Saltzman and Ted Ralphs
+// Copyright 2015, Matthew Saltzman and Ted Ralphs
+// Licensed under the Eclipse Public License 1.0
+
+#include <algorithm>
+#include <cmath>
+#ifdef __clang__
+//labs() is in cstdlib with clang
+#include <cstdlib>
+#include <cstdio>
+#endif
+#include <cassert>
+
+#include "CoinRational.hpp"
+
+// Based on Python code from
+// http://www.johndcook.com/blog/2010/10/20/best-rational-approximation/
+// (with permission).
+//
+// Returns closest (or almost, anyway) rational to val with denominator less
+// than or equal to maxdnom.  Return value is true if within tolerance, false
+// otherwise.

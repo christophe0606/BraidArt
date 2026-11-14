@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BraidArt}",
+            "name": "Debug BraidArt",
+            "target": "BraidArt",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug BraidArt"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BraidArt}",
+            "name": "Release BraidArt",
+            "target": "BraidArt",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release BraidArt"
+        }
+    ]
+}
