@@ -78,6 +78,7 @@ struct ContentView: View {
                         Button("Export PNG…",action:model.exportPNG).disabled(model.project==nil)
                         Button("Export Vector PDF…",action:model.exportPDF).disabled(model.curves==nil)
                         Button("Export 3D Object (GLB)…",action:model.exportGLB).disabled(model.curves==nil)
+                        Button("Export 3D Object (USDZ)…",action:model.exportUSDZ).disabled(model.curves==nil)
                         Button("Export Solution & Tile Data…",action:model.exportData).disabled(model.project==nil)
                         Text("Data export includes JSON, Wolfram data and tile images for subsequent processing.").font(.caption).foregroundStyle(.secondary)
                     }

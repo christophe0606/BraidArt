@@ -156,10 +156,11 @@ Camera fit, orbit, pan and zoom act on the camera, leaving exported geometry
 unchanged. Plane settings are optional in version-1 projects for backward
 compatibility; old projects default to their tile background and 0.15 clearance.
 
-The 3D workspace’s Export Picture action snapshots the live Metal view and writes
-a lossless PNG at its current pixel resolution. Camera framing, aspect ratio,
-lights, shadows and backing plane are retained, without the surrounding app UI.
-The capture is frozen before the save panel opens and does not reset the camera.
+The 3D workspace’s Export Picture action freezes the current camera before the
+save panel opens, then renders a lossless PNG in the background at the selected
+resolution. Zoom, rotation, pan, field of view, lights and backing plane are
+retained, without the surrounding app UI. A different output aspect ratio crops
+or extends the visible area at the sides without refitting the camera.
 
 GLB stores triangles, normals and materials with no external files. sRGB colors
 are converted to linear RGB for glTF base-color factors. It retains geometry
@@ -167,11 +168,21 @@ and color. Import it directly in Blender using File → Import → glTF 2.0;
 no separate curve export or importer script is needed. The imported strands
 are triangle meshes.
 
+USDZ exports the same indexed meshes and vertex normals in a centered component,
+with explicit MaterialBindingAPI bindings and linear RGB USD Preview Surface
+materials. A buffered USDA writer streams the geometry into a self-contained,
+uncompressed ZIP package with CRC-32 and 64-byte payload alignment. It needs no
+external converter. Progress and cancellation remain available; the destination
+is replaced atomically only after the complete package is ready. In Apple Motion,
+import the file using File → Import → Media, then use Motion's cameras and lights.
+
 Validation covers all four tile kinds, mixed-color seams, reversed paths, closed
 loops, paired triangle edges and normalized normals,
-GLB chunks/materials, old/new project loading and PDF image-resource absence.
+GLB chunks/materials, USDZ geometry/color round trips and cancellation, old/new
+project loading and PDF image-resource absence.
 A Metal snapshot test renders real geometry and exercises camera and plane
 updates. PDF output is also rendered with Poppler and checked with `pdfimages`.
 Blender has deliberately not been run.
 
-Format reference: [glTF 2.0 specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html).
+Format references: [glTF 2.0 specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html)
+and [USDZ specification](https://openusd.org/release/spec_usdz.html).

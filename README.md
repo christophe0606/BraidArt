@@ -52,6 +52,11 @@ locally signed, not notarized.
    Import the GLB directly in Blender using **File → Import → glTF 2.0**.
    It contains the strand geometry, backing plane and material colors; no script
    is required.
+7. **Export 3D Object (USDZ)** saves a self-contained colored object for Apple
+   Motion, with the same strands and backing plane centered around its anchor.
+   Export begins after **Save**, with progress and **Cancel**. In Motion, choose
+   **File → Import → Media** and select the `.usdz` file. Use Motion's own
+   cameras and lighting to position and animate the object.
 
 A saved project retains the exact sampled image, complete tile definitions,
 settings, solution and per-part solver reports. Reopen it to change the palette,

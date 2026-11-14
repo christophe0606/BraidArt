@@ -293,6 +293,43 @@ final class AppModel: ObservableObject {
         let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
         runExport("Exporting colored 3D object…",success:"Saved \(url.lastPathComponent)") { try GLBExporter.write(meshes:all,to:url) }
     }
+    func exportUSDZ() {
+        guard let curves,!busy,exportSavePanel == nil else { return }
+        let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
+        let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.usdz"
+        panel.allowedContentTypes=[UTType(filenameExtension:"usdz") ?? .data]
+        panel.message="Export a colored 3D object for Apple Motion."
+        exportSavePanel=panel
+        let completion:(NSApplication.ModalResponse)->Void = { [weak self] response in
+            guard let self else { return }
+            self.exportSavePanel=nil
+            guard response == .OK,let url=panel.url,!self.busy else { return }
+            self.startUSDZExport(all,to:url)
+        }
+        if let window=NSApp.keyWindow { panel.beginSheetModal(for:window,completionHandler:completion) }
+        else { panel.begin(completionHandler:completion) }
+    }
+    private func startUSDZExport(_ meshes:[TubeMesh],to url:URL) {
+        let export=ExportProgress(title:"Exporting USDZ",filename:url.lastPathComponent,message:"Preparing USDZ geometry…")
+        busy=true;progress=0;status="Exporting USDZ 3D object…";exportProgress=export
+        task=Task {
+            do {
+                try await Task.detached(priority:.userInitiated) {
+                    try USDZExporter.write(meshes:meshes,to:url) { value,message in
+                        DispatchQueue.main.async {
+                            guard !export.cancelling else { return }
+                            export.progress=value;export.message=message
+                        }
+                    }
+                }.valueWithCancellation()
+                exportProgress=nil;busy=false;progress=1;status="Saved \(url.lastPathComponent)"
+            } catch is CancellationError {
+                exportProgress=nil;busy=false;progress=0;status="USDZ export cancelled."
+            } catch {
+                exportProgress=nil;fail(error)
+            }
+        }
+    }
     private func runExport(_ message:String,success:String,operation:@escaping @Sendable () throws -> Void) {
         busy=true;status=message
         task=Task {

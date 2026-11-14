@@ -3,6 +3,7 @@ import AppKit
 import SceneKit
 import Metal
 import ImageIO
+import ModelIO
 @testable import BraidCore
 
 final class CurveTests:XCTestCase {
@@ -147,6 +148,80 @@ final class CurveTests:XCTestCase {
         // A later export still succeeds after a cancelled attempt.
         try CurveExporter.writePDF(braid,to:pdf)
         XCTAssertEqual(CGPDFDocument(pdf as CFURL)?.numberOfPages,1)
+    }
+    func testUSDZExportRoundTrip() throws {
+        let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)
+        let meshes=try TubeMesher.build(braid)+[TubeMesher.plane(braid,settings:project.sceneSettings!)]
+        let folder=URL(fileURLWithPath:FileManager.default.currentDirectoryPath).appendingPathComponent(".build/curve-validation")
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        let url=folder.appendingPathComponent("braid.usdz")
+        var updates=[Double]()
+        try USDZExporter.write(meshes:meshes,to:url) { value,_ in updates.append(value) }
+        XCTAssertEqual(updates.first,0);XCTAssertEqual(updates.last,1)
+        XCTAssertEqual(updates,updates.sorted())
+        XCTAssertEqual(Array(try Data(contentsOf:url).prefix(4)),[0x50,0x4b,0x03,0x04],"USDZ must be a package")
+        let imported=try SCNScene(url:url,options:nil)
+        var geometries=[SCNGeometry]()
+        imported.rootNode.enumerateChildNodes { node,_ in if let geometry=node.geometry { geometries.append(geometry) } }
+        XCTAssertEqual(geometries.count,meshes.count)
+        XCTAssertEqual(geometries.reduce(0) { $0+$1.elements.reduce(0) { $0+$1.primitiveCount } },meshes.reduce(0) { $0+$1.indices.count/3 })
+        XCTAssertTrue(geometries.allSatisfy { !$0.sources(for:.normal).isEmpty })
+        XCTAssertEqual(MDLAsset(url:url).childObjects(of:MDLMesh.self).count,meshes.count)
+        let bounds=imported.rootNode.boundingBox
+        XCTAssertEqual(bounds.min.x+bounds.max.x,0,accuracy:0.0001)
+        XCTAssertEqual(bounds.min.y+bounds.max.y,0,accuracy:0.0001)
+        XCTAssertEqual(bounds.min.z+bounds.max.z,0,accuracy:0.0001)
+        let linearSpace=try XCTUnwrap(CGColorSpace(name:CGColorSpace.extendedLinearSRGB))
+        let materials:[SCNMaterial]=geometries.compactMap { $0.firstMaterial }
+        for mesh in meshes {
+            let expected=try XCTUnwrap(CGColor(srgbRed:mesh.color.r,green:mesh.color.g,blue:mesh.color.b,alpha:1).converted(to:linearSpace,intent:.defaultIntent,options:nil)?.components)
+            let material=try XCTUnwrap(materials.first { material in
+                // Check the linear USD shader values; the native importer tags these colors with its display profile.
+                guard let color=material.diffuse.contents as? NSColor else { return false }
+                return abs(color.redComponent-expected[0])<0.001 && abs(color.greenComponent-expected[1])<0.001 && abs(color.blueComponent-expected[2])<0.001
+            },"Missing material color for \(mesh.name)")
+            XCTAssertEqual((material.roughness.contents as? NSNumber)?.doubleValue ?? -1,mesh.name=="Backing plane" ? 0.65 : 0.23,accuracy:0.001)
+        }
+        let bytes=try Data(contentsOf:url)
+        func u16(_ offset:Int)->Int { Int(bytes[offset]) | Int(bytes[offset+1])<<8 }
+        let offset=30+u16(26)+u16(28)
+        XCTAssertEqual(u16(8),0,"USDZ entries must be uncompressed")
+        XCTAssertEqual(offset%64,0,"USDZ payloads must be aligned to 64 bytes")
+        XCTAssertTrue(String(decoding:bytes[offset...],as:UTF8.self).contains("prepend apiSchemas = [\"MaterialBindingAPI\"]"))
+    }
+    func testUSDZCancellationAndInvalidMeshesPreserveDestination() async throws {
+        let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)
+        let meshes=try TubeMesher.build(braid)+[TubeMesher.plane(braid,settings:project.sceneSettings!)]
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:folder) }
+        let url=folder.appendingPathComponent("cancelled.usdz"),original=Data("existing file".utf8)
+        for milestone in [0.0,0.85,0.97] {
+            for existing in [false,true] {
+                if existing { try original.write(to:url) }
+                let task=Task.detached {
+                    try USDZExporter.write(meshes:meshes,to:url) { value,_ in
+                        if value==milestone { withUnsafeCurrentTask { $0?.cancel() } }
+                    }
+                }
+                do { try await task.value;XCTFail("Expected cancellation") }
+                catch is CancellationError {}
+                catch { XCTFail("Unexpected error: \(error)") }
+                if existing {
+                    XCTAssertEqual(try Data(contentsOf:url),original)
+                    try FileManager.default.removeItem(at:url)
+                } else { XCTAssertFalse(FileManager.default.fileExists(atPath:url.path)) }
+            }
+        }
+        try original.write(to:url)
+        var invalid=meshes[0];invalid.indices=[0,1]
+        XCTAssertThrowsError(try USDZExporter.write(meshes:[invalid],to:url))
+        invalid=meshes[0];invalid.normals[0].x = .nan
+        XCTAssertThrowsError(try USDZExporter.write(meshes:[invalid],to:url))
+        invalid=meshes[0];invalid.indices[0]=UInt32.max
+        XCTAssertThrowsError(try USDZExporter.write(meshes:[invalid],to:url))
+        XCTAssertThrowsError(try USDZExporter.write(meshes:[],to:url))
+        XCTAssertEqual(try Data(contentsOf:url),original)
     }
     @MainActor func testPictureExportKeepsCurrentCameraAcrossAspectRatios() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
