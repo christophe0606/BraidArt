@@ -45,6 +45,18 @@ public final class BraidMetalView: SCNView {
     private var fitDistance:Float=10
     private var lastPoint=NSPoint.zero
     private var panGesture=false
+    public var onCameraChanged:((CameraState)->Void)?
+    public var cameraState:CameraState {
+        CameraState(target:CurvePoint(Double(target.x),Double(target.y),Double(target.z)),orbitYaw:orbitYaw,orbitPitch:orbitPitch,
+                    cameraDistance:cameraDistance,fitDistance:fitDistance,fieldOfView:Double(cameraNode.camera!.fieldOfView))
+    }
+    public func restoreCamera(_ state:CameraState) throws {
+        try state.validate()
+        target=SCNVector3(state.target.x,state.target.y,state.target.z)
+        orbitYaw=state.orbitYaw;orbitPitch=state.orbitPitch;cameraDistance=state.cameraDistance;fitDistance=state.fitDistance
+        cameraNode.camera!.fieldOfView=CGFloat(state.fieldOfView)
+        updateCamera()
+    }
     public override var acceptsFirstResponder:Bool { true }
     public override init(frame:CGRect = .zero) {
         super.init(frame:frame,options:[SCNView.Option.preferredRenderingAPI.rawValue:SCNRenderingAPI.metal.rawValue])
@@ -124,6 +136,7 @@ public final class BraidMetalView: SCNView {
     private func updateCamera() {
         cameraNode.position=SCNVector3(target.x+CGFloat(cameraDistance*sin(orbitYaw)*cos(orbitPitch)),target.y+CGFloat(cameraDistance*sin(orbitPitch)),target.z+CGFloat(cameraDistance*cos(orbitYaw)*cos(orbitPitch)))
         cameraNode.look(at:target);needsDisplay=true
+        onCameraChanged?(cameraState)
     }
     public override func mouseDown(with event:NSEvent) { window?.makeFirstResponder(self);lastPoint=event.locationInWindow;panGesture=event.modifierFlags.contains(.shift) }
     public override func rightMouseDown(with event:NSEvent) { lastPoint=event.locationInWindow;panGesture=true }

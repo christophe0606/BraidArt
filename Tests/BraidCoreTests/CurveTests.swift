@@ -276,6 +276,61 @@ final class CurveTests:XCTestCase {
             }
         }
     }
+    @MainActor func testProjectRestoresCameraAndPictureDimensions() async throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
+        var project=try fixture()
+        project.sourceName="Camera restoration validation"
+        let braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)
+        let meshes=try TubeMesher.build(braid)
+        let view=BraidMetalView(frame:CGRect(x:0,y:0,width:1000,height:800))
+        view.display(braid,meshes:meshes,settings:project.sceneSettings!)
+        var changes=[CameraState]()
+        view.onCameraChanged={ changes.append($0) }
+        view.orbit(dx:0.4,dy:-0.25);view.zoom(factor:0.8);view.pan(dx:35,dy:-20)
+        XCTAssertEqual(changes.count,3)
+        XCTAssertEqual(changes.last,view.cameraState)
+        project.cameraState=view.cameraState;project.pictureExportSize = .instagramStory
+        let folder=URL(fileURLWithPath:FileManager.default.currentDirectoryPath).appendingPathComponent(".build/curve-validation")
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        let url=folder.appendingPathComponent("framed-camera.braidart")
+        try project.save(to:url)
+        let saved=try BraidProject.load(from:url)
+        XCTAssertEqual(saved.cameraState,view.cameraState)
+        XCTAssertEqual(saved.pictureExportSize,.instagramStory)
+        let restored=BraidMetalView(frame:view.frame)
+        restored.display(braid,meshes:meshes,settings:saved.sceneSettings!)
+        try restored.restoreCamera(XCTUnwrap(saved.cameraState))
+        XCTAssertEqual(restored.cameraState,view.cameraState)
+        XCTAssertTrue(SCNMatrix4EqualToMatrix4(restored.cameraNode.transform,view.cameraNode.transform))
+        let before=try view.makePictureCapture(),after=try restored.makePictureCapture()
+        let size=PictureExportSize.instagramStory.pixelSize(viewport:view.viewportPixelSize)
+        let images=try await Task.detached { (try before.render(size:size),try after.render(size:size)) }.value
+        let a=try ImageProcessor.pixels(from:images.0),b=try ImageProcessor.pixels(from:images.1)
+        let difference=zip(a.pixels,b.pixels).reduce(0) { $0+abs($1.0.r-$1.1.r)+abs($1.0.g-$1.1.g)+abs($1.0.b-$1.1.b) }/Double(a.pixels.count*3)
+        XCTAssertLessThan(difference,0.01,"Restored camera and frame must export the same composition")
+        // Controls continue from the restored orbit and retain the original zoom limits.
+        view.zoom(factor:100);restored.zoom(factor:100)
+        view.orbit(dx:0.1,dy:0.1);restored.orbit(dx:0.1,dy:0.1)
+        XCTAssertEqual(restored.cameraState,view.cameraState)
+        var legacy=try JSONSerialization.jsonObject(with:Data(contentsOf:url)) as! [String:Any]
+        legacy.removeValue(forKey:"cameraState");legacy.removeValue(forKey:"pictureExportSize")
+        let legacyURL=folder.appendingPathComponent("legacy-camera.braidart")
+        try JSONSerialization.data(withJSONObject:legacy).write(to:legacyURL)
+        let old=try BraidProject.load(from:legacyURL)
+        XCTAssertNil(old.cameraState);XCTAssertNil(old.pictureExportSize)
+        for preset in PictureExportSize.allCases {
+            project.pictureExportSize=preset
+            let encoded=try JSONEncoder().encode(project)
+            XCTAssertEqual(try JSONDecoder().decode(BraidProject.self,from:encoded).pictureExportSize,preset)
+        }
+        var invalid=try XCTUnwrap(saved.cameraState)
+        invalid.cameraDistance=0;project.cameraState=invalid
+        XCTAssertThrowsError(try project.validate())
+        invalid=try XCTUnwrap(saved.cameraState);invalid.orbitPitch=2;project.cameraState=invalid
+        XCTAssertThrowsError(try project.validate())
+        invalid=try XCTUnwrap(saved.cameraState);invalid.target.x = .nan;project.cameraState=invalid
+        XCTAssertThrowsError(try project.validate())
+    }
     @MainActor func testPictureExportPresetsAndNativeRendering() async throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
         let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)

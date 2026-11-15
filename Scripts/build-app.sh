@@ -21,4 +21,6 @@ cp Sources/BraidArt/Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns
 codesign --force --sign - "$APP/Contents/Resources/Solver/bin/cbc"
 codesign --force --sign - "$APP"
 codesign --verify --deep --strict "$APP"
+# Refresh Finder's project-file association after rebuilding the bundle in place.
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
 echo "Built $APP"

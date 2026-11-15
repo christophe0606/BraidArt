@@ -16,10 +16,13 @@
 <key>LSApplicationCategoryType</key><string>public.app-category.graphics-design</string>
 <key>CFBundleDocumentTypes</key><array><dict>
 <key>CFBundleTypeName</key><string>BraidArt Project</string><key>CFBundleTypeRole</key><string>Editor</string><key>LSHandlerRank</key><string>Owner</string>
+<key>CFBundleTypeExtensions</key><array><string>braidart</string></array>
+<key>CFBundleTypeIconFile</key><string>AppIcon.icns</string>
 <key>LSItemContentTypes</key><array><string>org.braidart.project</string></array>
 </dict><dict><key>CFBundleTypeName</key><string>Image</string><key>CFBundleTypeRole</key><string>Viewer</string><key>LSItemContentTypes</key><array><string>public.image</string></array></dict></array>
 <key>UTExportedTypeDeclarations</key><array><dict>
 <key>UTTypeIdentifier</key><string>org.braidart.project</string><key>UTTypeDescription</key><string>BraidArt Project</string>
+<key>UTTypeIconFile</key><string>AppIcon.icns</string>
 <key>UTTypeConformsTo</key><array><string>public.json</string></array>
 <key>UTTypeTagSpecification</key><dict><key>public.filename-extension</key><array><string>braidart</string></array></dict>
 </dict></array>

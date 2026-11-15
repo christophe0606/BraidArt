@@ -10,6 +10,8 @@ building on an Intel Mac produces an Intel app and solver.
 Open **`dist/BraidArt.app`** in Finder after building. The app includes CBC and
 requires neither Mathematica nor Homebrew at runtime. This development build is
 locally signed, not notarized.
+The build registers `.braidart` files as **BraidArt Project** documents with
+macOS. Double-click a project in Finder to open it in BraidArt.
 
 1. Choose **Open Image or Project**. Drag over the source to crop it; use **Reset
    Crop** to restore the full picture. Set the image width in tiles. The height
@@ -35,8 +37,13 @@ locally signed, not notarized.
    Time and relative-gap limits support interactive use. Every returned part is
    checked for integral choices and valid edge colors before acceptance.
 4. Inspect the result and zoom in. **Save Project** stores a `.braidart` JSON
-   project; **Export PNG** renders a higher-resolution picture. **Export Solution
-   & Tile Data** creates a self-contained folder of JSON, Wolfram data and tile
+   project, including the 3D camera's rotation, zoom and pan, backing plane
+   settings, and selected picture dimensions. Reopening restores that camera
+   in the 3D view; older projects without a saved camera open in Result.
+   The original full-resolution source picture is not embedded.
+   All export commands are in **File → Export**, directly below
+   **Save Project…**. **Result as PNG…** renders a higher-resolution picture.
+   **Solution and Tile Data…** creates a self-contained folder of JSON, Wolfram data and tile
    PNGs. The export dialog chooses a parent directory and creates a fresh child
    folder without overwriting an earlier export.
 5. Open **3D** to view continuous, colored tube meshes rendered through Metal.
@@ -47,7 +54,7 @@ locally signed, not notarized.
    select a PNG size. A red rectangle over the 3D view marks exactly the area
    that will be exported; rotate, pan and zoom to compose inside it. The frame
    follows the viewport when you resize the window and is not included in the PNG.
-   **Export Picture…** saves the
+   **File → Export → 3D View as PNG…** saves the
    current 3D view as a PNG, including its angle, zoom, pan, lighting and backing
    plane. The size menu and save panel share the same selection: current viewport, HD
    (1280 × 720), Full HD (1920 × 1080), 4K UHD (3840 × 2160), or Instagram
@@ -57,17 +64,16 @@ locally signed, not notarized.
    The camera is frozen when you open the export panel, preserving your zoom,
    rotation and pan. A different output aspect ratio crops the visible view
    to the centered red frame without changing the live camera.
-6. **Export Vector PDF** writes a single page of filled strand contours with
+6. **File → Export → Vector PDF…** writes a single page of filled strand contours with
    fine black outlines, edged underpass ends and no embedded images. Generation
    starts after you choose a destination and click **Save**. A progress window
    includes **Cancel**; cancelling preserves any existing destination file.
-   **Export 3D Object
-   (GLB)** saves the same tube meshes and backing plane with normals and colored
+   **File → Export → 3D Object (GLB)…** saves the same tube meshes and backing plane with normals and colored
    PBR materials in a self-contained glTF 2.0 file.
    Import the GLB directly in Blender using **File → Import → glTF 2.0**.
    It contains the strand geometry, backing plane and material colors; no script
    is required.
-7. **Export 3D Object (USDZ)** saves a self-contained colored object for Apple
+7. **File → Export → 3D Object (USDZ)…** saves a self-contained colored object for Apple
    Motion, with the same strands and backing plane centered around its anchor.
    Export begins after **Save**, with progress and **Cancel**. In Motion, choose
    **File → Import → Media** and select the `.usdz` file. Use Motion's own

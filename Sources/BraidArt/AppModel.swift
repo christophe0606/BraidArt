@@ -75,6 +75,8 @@ final class AppModel: ObservableObject {
     @Published var obliqueCamera=false
     @Published var exportProgress: ExportProgress?
     @Published var pictureExportSize:PictureExportSize = .viewport
+    // Camera gestures do not need to invalidate SwiftUI on every mouse movement.
+    private(set) var cameraState:CameraState?
     private weak var threeDView:BraidMetalView?
     private var sourceURL: URL?
     private var task: Task<Void,Never>?
@@ -114,7 +116,7 @@ final class AppModel: ObservableObject {
     }
 
     func chooseImage() {
-        let panel=NSOpenPanel();panel.allowedContentTypes=[.image,.json,UTType(filenameExtension:"braidart") ?? .json];panel.allowsMultipleSelection=false
+        let panel=NSOpenPanel();panel.allowedContentTypes=[.image,.json,.braidArtProject];panel.allowsMultipleSelection=false
         if panel.runModal() == .OK,let url=panel.url { open(url:url) }
     }
     func open(url: URL) {
@@ -127,7 +129,7 @@ final class AppModel: ObservableObject {
                 let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.value
                 guard rev==revision else { return }
                 sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.nsImage;settings.crop=Crop()
-                prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];selectedTab=0;busy=false
+                prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;busy=false
                 prepare()
             } catch { fail(error) }
         }
@@ -203,7 +205,7 @@ final class AppModel: ObservableObject {
                 let rendered=try await Task.detached{try TileRenderer.render(solution:result.solution,data:data,tileSize:min(40,max(8,3200/max(image.width,image.height))))}.value
                 let generated=try await Task.detached { try CurveGenerator.generate(solution:result.solution,data:data) }.value
                 let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
-                curves=generated;meshes=tubes;curveGeneration+=1
+                cameraState=nil;curves=generated;meshes=tubes;curveGeneration+=1
                 sceneSettings=SceneSettings(planeColor:data.background)
                 project=BraidProject(sourceName:name,settings:snapshot,sampledImage:image,tileData:data,result:result)
                 project?.sceneSettings=sceneSettings
@@ -225,11 +227,16 @@ final class AppModel: ObservableObject {
         if panel.runModal() == .OK,let url=panel.url { solverURL=url }
     }
     func saveProject() {
-        guard let project=project,!busy else { return }
-        let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName).braidart";panel.allowedContentTypes=[UTType(filenameExtension:"braidart") ?? .json]
+        guard let project=projectForSaving,!busy else { return }
+        let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName).braidart";panel.allowedContentTypes=[.braidArtProject];panel.isExtensionHidden=false
         if panel.runModal() == .OK,let url=panel.url {
             do { try project.save(to:url);status="Saved \(url.lastPathComponent)" } catch { fail(error) }
         }
+    }
+    var projectForSaving:BraidProject? {
+        guard var saved=project else { return nil }
+        saved.sceneSettings=sceneSettings;saved.cameraState=cameraState;saved.pictureExportSize=pictureExportSize
+        return saved
     }
     private func loadProject(_ url: URL) {
         busy=true;status="Opening project…"
@@ -241,10 +248,11 @@ final class AppModel: ObservableObject {
                 let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
                 curves=generated;meshes=tubes;curveGeneration+=1
                 sceneSettings=loaded.sceneSettings ?? SceneSettings(planeColor:loaded.tileData.background)
+                cameraState=loaded.cameraState;pictureExportSize=loaded.pictureExportSize ?? .viewport
                 paletteIDs=loaded.settings.palette.map { _ in UUID() }
                 sourceURL=nil;sourceImage=nil;sourceName=loaded.sourceName;settings=loaded.settings
                 prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).nsImage
-                project=loaded;resultImage=rendered.nsImage;refreshTiles();selectedTab=2;busy=false
+                project=loaded;resultImage=rendered.nsImage;refreshTiles();selectedTab=loaded.cameraState == nil ? 2 : 3;busy=false
                 status="Project restored · \(loaded.sampledImage.width) × \(loaded.sampledImage.height) tiles"
             } catch { fail(error) }
         }
@@ -262,7 +270,7 @@ final class AppModel: ObservableObject {
         }
     }
     func exportData() {
-        guard let project=project,!busy else { return }
+        guard let project=projectForSaving,!busy else { return }
         let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true
         panel.message="Choose a parent folder for the solution, tile data and Wolfram export."
         guard panel.runModal() == .OK,let parent=panel.url else { return }
@@ -278,6 +286,7 @@ final class AppModel: ObservableObject {
     }
     func sceneSettingsChanged() { project?.sceneSettings=sceneSettings }
     func resetCamera(oblique:Bool) { obliqueCamera=oblique;cameraReset+=1 }
+    func cameraChanged(_ state:CameraState) { cameraState=state }
     func register3DView(_ view:BraidMetalView) { threeDView=view }
     func export3DPicture() {
         guard !busy,exportSavePanel == nil,selectedTab==3,curves != nil,let view=threeDView,let window=view.window else { return }

@@ -1,7 +1,7 @@
 import Foundation
 import CoreGraphics
 
-public enum PictureExportSize: String, CaseIterable, Identifiable, Sendable {
+public enum PictureExportSize: String, Codable, CaseIterable, Identifiable, Sendable {
     case viewport, hd, fullHD, ultraHD, instagramSquare, instagramPortrait, instagramTallPortrait, instagramLandscape, instagramStory
     public var id:String { rawValue }
     public var title:String {

@@ -80,11 +80,7 @@ struct ContentView: View {
                             Text("20 px").tag(20);Text("50 px").tag(50);Text("100 px").tag(100)
                         }
                         Button("Save Project…",action:model.saveProject).disabled(model.project==nil)
-                        Button("Export PNG…",action:model.exportPNG).disabled(model.project==nil)
-                        Button("Export Vector PDF…",action:model.exportPDF).disabled(model.curves==nil)
-                        Button("Export 3D Object (GLB)…",action:model.exportGLB).disabled(model.curves==nil)
-                        Button("Export 3D Object (USDZ)…",action:model.exportUSDZ).disabled(model.curves==nil)
-                        Button("Export Solution & Tile Data…",action:model.exportData).disabled(model.project==nil)
+                        Text("Choose File → Export for all export formats.").font(.caption).foregroundStyle(.secondary)
                         Text("Data export includes JSON, Wolfram data and tile images for subsequent processing.").font(.caption).foregroundStyle(.secondary)
                     }
                 }.padding(22).disabled(model.busy)
@@ -207,7 +203,6 @@ struct ContentView: View {
                     Spacer()
                     Button("Front / Fit") { model.resetCamera(oblique:false) }
                     Button("Perspective") { model.resetCamera(oblique:true) }
-                    Button("Export Picture…",action:model.export3DPicture).disabled(model.busy)
                 }.padding(20)
                 HStack(spacing:20) {
                     ColorPicker("Backing plane",selection:Binding(get:{model.sceneSettings.planeColor.color},set:{model.sceneSettings.planeColor=RGB(color:$0)}),supportsOpacity:false).frame(maxWidth:230)
@@ -226,7 +221,7 @@ struct ContentView: View {
                 if let project=model.project,project.settings != model.settings {
                     Label("Showing the previous result. Weave again to apply the current settings.",systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).padding(.bottom,12)
                 }
-                Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,onViewReady:model.register3DView)
+                Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,camera:model.cameraState,onCameraChanged:model.cameraChanged,onViewReady:model.register3DView)
                     .overlay {
                         GeometryReader { proxy in
                             let frame=model.pictureExportSize.frame(in:CGRect(origin:.zero,size:proxy.size))

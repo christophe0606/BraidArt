@@ -18,14 +18,14 @@ struct BraidArtApp: App {
             CommandGroup(replacing:.newItem) {
                 Button("Open Image or Project…") { model.chooseImage() }.keyboardShortcut("o")
                 Button("Save Project…") { model.saveProject() }.keyboardShortcut("s").disabled(model.project == nil || model.busy)
-            }
-            CommandGroup(after:.importExport) {
-                Button("Export Result as PNG…") { model.exportPNG() }.disabled(model.project == nil || model.busy)
-                Button("Export 3D View as PNG…") { model.export3DPicture() }.disabled(model.selectedTab != 3 || model.curves == nil || model.busy)
-                Button("Export Vector PDF…") { model.exportPDF() }.disabled(model.curves == nil || model.busy)
-                Button("Export 3D Object (GLB)…") { model.exportGLB() }.disabled(model.curves == nil || model.busy)
-                Button("Export 3D Object (USDZ)…") { model.exportUSDZ() }.disabled(model.curves == nil || model.busy)
-                Button("Export Solution and Tile Data…") { model.exportData() }.disabled(model.project == nil || model.busy)
+                Menu("Export") {
+                    Button("Result as PNG…") { model.exportPNG() }.disabled(model.project == nil || model.busy)
+                    Button("3D View as PNG…") { model.export3DPicture() }.disabled(model.selectedTab != 3 || model.curves == nil || model.busy)
+                    Button("Vector PDF…") { model.exportPDF() }.disabled(model.curves == nil || model.busy)
+                    Button("3D Object (GLB)…") { model.exportGLB() }.disabled(model.curves == nil || model.busy)
+                    Button("3D Object (USDZ)…") { model.exportUSDZ() }.disabled(model.curves == nil || model.busy)
+                    Button("Solution and Tile Data…") { model.exportData() }.disabled(model.project == nil || model.busy)
+                }
             }
         }
         Window("About BraidArt",id:"about") {
