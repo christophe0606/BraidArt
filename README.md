@@ -20,8 +20,15 @@ by [scikit-image](https://scikit-image.org/docs/stable/api/skimage.data.html#ski
 The About window links to the [original photograph](https://flic.kr/p/r9qvLn)
 and NASA’s media usage guidelines.
 
-1. Choose **Open Image or Project**. Drag over the source to crop it; use **Reset
-   Crop** to restore the full picture. Set the image width in tiles. The height
+1. Choose **Open Image or Project**, or drag an image file from Finder onto the
+   main window. Saved projects can also be dropped onto the window. Drag over the
+   source to draw a crop. Drag inside the rectangle to move it, or drag any edge
+   or corner to resize it. Pinch or use the **− / +** buttons above the picture to
+   scale the crop while preserving its proportions. **Aspect ratio** offers Free
+   and the same fixed formats as 3D picture export; a selected ratio stays locked
+   when drawing, resizing or scaling. **Delete Crop** (or Delete while the crop
+   editor is focused) restores the full picture and lets you draw a new rectangle
+   using the selected ratio. Set the image width in tiles. The height
    follows the crop's aspect ratio, with a maximum of 256 tiles on either axis.
 2. Start with black and white strands over a gray background, or set a maximum
    of two to eight colors and select **Extract** to find representative colors
@@ -110,12 +117,10 @@ The solver script verifies pinned SHA-256 checksums, compiles CBC/CLP and their
 COIN-OR dependencies with Apple clang, and installs only under `.build/`. It
 builds static COIN-OR libraries with macOS 14 as the deployment target. Bundle
 licenses and exact upstream versions are listed in [Docs/ThirdParty.md](Docs/ThirdParty.md).
-The app can also use an existing CBC executable through **Choose CBC Executable**
-or the `BRAIDART_CBC` environment variable.
-
 Open `Package.swift` in Xcode for editing and debugging. A source-run app finds
 `.build/solver-native/bin/cbc` when its working directory is the repository;
-otherwise choose that executable in the interface. `Scripts/build-app.sh` creates
+otherwise set `BRAIDART_CBC` to the executable path for development.
+`Scripts/build-app.sh` creates
 a standalone Finder bundle with native document opening, menus and local signing.
 
 ## Implementation and notebook compatibility

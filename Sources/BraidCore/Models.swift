@@ -34,6 +34,7 @@ public struct Crop: Codable, Equatable, Sendable {
 
 public struct Settings: Codable, Equatable, Sendable {
     public var crop = Crop()
+    public var cropAspectRatio: PictureExportSize? = nil
     public var columns = 50
     public var partitionSize = 7
     public var strandWidth = 0.414
