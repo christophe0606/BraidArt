@@ -149,6 +149,12 @@ otherwise set `BRAIDART_CBC` to the executable path for development.
 `Scripts/build-app.sh` creates
 a standalone Finder bundle with native document opening, menus and local signing.
 
+For distribution outside the Mac App Store, follow the short one-time Xcode and
+Keychain setup in [Distributing BraidArt](Docs/Distribution.md), then run
+`./Scripts/release-app.sh`. It builds, signs, notarizes and creates a distribution
+ZIP using credentials kept in Keychain. Normal development builds continue to
+use local ad hoc signing and need no Developer ID certificate.
+
 ## Implementation and notebook compatibility
 
 - Core Image performs oriented, color-managed cropping, alpha flattening,
