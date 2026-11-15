@@ -43,16 +43,20 @@ locally signed, not notarized.
    Drag to rotate; Shift-drag, right-drag or middle-drag to pan; scroll or pinch
    to zoom. **Front / Fit** resets the camera; **Perspective** gives an angled
    view. Set the backing plane color and its clearance from the lowest tube.
-   These settings are retained in the project. **Export Picture…** saves the
+   These settings are retained in the project. Use **Picture dimensions** to
+   select a PNG size. A red rectangle over the 3D view marks exactly the area
+   that will be exported; rotate, pan and zoom to compose inside it. The frame
+   follows the viewport when you resize the window and is not included in the PNG.
+   **Export Picture…** saves the
    current 3D view as a PNG, including its angle, zoom, pan, lighting and backing
-   plane. Choose the output size in the save panel: current viewport, HD
+   plane. The size menu and save panel share the same selection: current viewport, HD
    (1280 × 720), Full HD (1920 × 1080), 4K UHD (3840 × 2160), or Instagram
    square (1080 × 1080), portrait (1080 × 1350), tall portrait (1080 × 1440),
    landscape (1080 × 566), and Story (1080 × 1920). Pictures are rendered at the
    selected resolution after **Save**; a progress window includes **Cancel**.
    The camera is frozen when you open the export panel, preserving your zoom,
-   rotation, pan and field of view. A different output aspect ratio crops or
-   extends the visible area at the sides without changing the camera.
+   rotation and pan. A different output aspect ratio crops the visible view
+   to the centered red frame without changing the live camera.
 6. **Export Vector PDF** writes a single page of filled strand contours with
    fine black outlines, edged underpass ends and no embedded images. Generation
    starts after you choose a destination and click **Save**. A progress window

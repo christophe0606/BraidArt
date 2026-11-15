@@ -74,6 +74,7 @@ final class AppModel: ObservableObject {
     @Published var cameraReset=0
     @Published var obliqueCamera=false
     @Published var exportProgress: ExportProgress?
+    @Published var pictureExportSize:PictureExportSize = .viewport
     private weak var threeDView:BraidMetalView?
     private var sourceURL: URL?
     private var task: Task<Void,Never>?
@@ -83,7 +84,6 @@ final class AppModel: ObservableObject {
     private var cachedTileData: TileData?
     private var paletteIDs=BraidCore.Settings().palette.map { _ in UUID() }
     private var exportSavePanel: NSSavePanel?
-    private var pictureExportSize:PictureExportSize = .viewport
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? "CPU fallback" }
     var tileData: TileData { TileData(settings:settings) }
     var preparedIsCurrent: Bool { prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true }
@@ -284,7 +284,9 @@ final class AppModel: ObservableObject {
         let capture:BraidPictureCapture
         do { capture=try view.makePictureCapture() }
         catch { fail(error);return }
-        let options=PictureExportOptions(size:pictureExportSize,viewport:view.viewportPixelSize)
+        let options=PictureExportOptions(size:pictureExportSize,viewport:view.viewportPixelSize) { [weak self] size in
+            self?.pictureExportSize=size
+        }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]
         panel.message="Export the current 3D picture."
         let accessory=NSHostingView(rootView:PictureExportOptionsView(options:options))

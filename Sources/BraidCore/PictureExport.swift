@@ -30,4 +30,14 @@ public enum PictureExportSize: String, CaseIterable, Identifiable, Sendable {
         case .instagramStory: return CGSize(width:1080,height:1920)
         }
     }
+    /// The largest centered picture frame that fits inside the visible 3D viewport.
+    public static func frame(for pictureSize:CGSize,in viewport:CGRect)->CGRect {
+        guard pictureSize.width>0,pictureSize.height>0,viewport.width>0,viewport.height>0 else { return .zero }
+        let scale=min(viewport.width/pictureSize.width,viewport.height/pictureSize.height)
+        let size=CGSize(width:pictureSize.width*scale,height:pictureSize.height*scale)
+        return CGRect(x:viewport.midX-size.width/2,y:viewport.midY-size.height/2,width:size.width,height:size.height)
+    }
+    public func frame(in viewport:CGRect)->CGRect {
+        Self.frame(for:pixelSize(viewport:viewport.size),in:viewport)
+    }
 }

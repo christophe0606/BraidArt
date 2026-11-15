@@ -216,10 +216,25 @@ struct ContentView: View {
                     Text(String(format:"%.2f tiles",model.sceneSettings.planeDistance)).font(.caption.monospacedDigit()).frame(width:75)
                     Spacer()
                 }.padding(.horizontal,20).padding(.bottom,16)
+                HStack(spacing:16) {
+                    Picker("Picture dimensions",selection:$model.pictureExportSize) {
+                        ForEach(PictureExportSize.allCases) { size in Text(size.title).tag(size) }
+                    }.pickerStyle(.menu).fixedSize()
+                    Text("The red frame marks the exported area.").font(.caption).foregroundStyle(.secondary)
+                    Spacer(minLength:0)
+                }.padding(.horizontal,20).padding(.bottom,16)
                 if let project=model.project,project.settings != model.settings {
                     Label("Showing the previous result. Weave again to apply the current settings.",systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).padding(.bottom,12)
                 }
                 Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,onViewReady:model.register3DView)
+                    .overlay {
+                        GeometryReader { proxy in
+                            let frame=model.pictureExportSize.frame(in:CGRect(origin:.zero,size:proxy.size))
+                            Rectangle().strokeBorder(.red,lineWidth:2)
+                                .frame(width:frame.width,height:frame.height)
+                                .position(x:frame.midX,y:frame.midY)
+                        }.allowsHitTesting(false).accessibilityHidden(true)
+                    }
                 Text("Plane clearance is measured from the back of the lowest strand. Plane settings are saved with the project and 3D exports.").font(.caption).foregroundStyle(.secondary).padding(14)
             } else {
                 emptyState(symbol:"cube.transparent",title:"Curves become a sculpture",detail:"Weave an image or open a saved project to inspect its connected strands in 3D.",button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)

@@ -3,9 +3,12 @@ import BraidCore
 
 @MainActor
 final class PictureExportOptions: ObservableObject {
-    @Published var size:PictureExportSize
+    @Published var size:PictureExportSize { didSet { onSizeChange?(size) } }
     let viewport:CGSize
-    init(size:PictureExportSize,viewport:CGSize) { self.size=size;self.viewport=viewport }
+    private let onSizeChange:((PictureExportSize)->Void)?
+    init(size:PictureExportSize,viewport:CGSize,onSizeChange:((PictureExportSize)->Void)? = nil) {
+        self.size=size;self.viewport=viewport;self.onSizeChange=onSizeChange
+    }
     var pixelSize:CGSize { size.pixelSize(viewport:viewport) }
 }
 
@@ -18,7 +21,7 @@ struct PictureExportOptionsView: View {
             }
             Text("\(Int(options.pixelSize.width)) × \(Int(options.pixelSize.height)) pixels · PNG")
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            Text("Keeps your current zoom, rotation and pan. The output shape changes the visible area at the sides. Rendering starts after Save.")
+            Text("Exports the area inside the red frame in the 3D view, keeping your current rotation and pan. Changing the output size updates the frame. Rendering starts after Save.")
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
         }.padding(12).frame(width:460)
     }

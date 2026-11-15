@@ -252,11 +252,28 @@ final class CurveTests:XCTestCase {
         view.fit(columns:braid.columns,rows:braid.rows)
         let frozen=try await Task.detached { try current.render(size:referenceSize) }.value
         XCTAssertLessThan(try difference(after,frozen),0.01)
-        // With the same height, changing aspect ratio must crop the sides, preserving zoom.
-        for width in [800,450] {
-            let image=try await Task.detached { try current.render(size:CGSize(width:width,height:800)) }.value
-            let crop=try XCTUnwrap(after.cropping(to:CGRect(x:(1000-width)/2,y:0,width:width,height:800)))
-            XCTAssertLessThan(try difference(crop,image),0.01,"Changing output shape must not zoom out")
+        // Portrait and wide pictures must match the area inside the visible frame.
+        // The frozen viewport also stays fixed if the window is resized during export.
+        view.setFrameSize(CGSize(width:700,height:1000))
+        for size in [CGSize(width:800,height:800),CGSize(width:450,height:800),CGSize(width:1000,height:400),referenceSize] {
+            let image=try await Task.detached { try current.render(size:size) }.value
+            let frame=PictureExportSize.frame(for:size,in:CGRect(origin:.zero,size:referenceSize))
+            let crop=try XCTUnwrap(after.cropping(to:frame))
+            XCTAssertLessThan(try difference(crop,image),0.01,"Export must match the framed viewport crop")
+        }
+    }
+    func testPictureFramesFitAndStayCenteredForEveryPreset() {
+        for viewport in [CGRect(x:0,y:0,width:1000,height:800),CGRect(x:15,y:25,width:600,height:1000)] {
+            for preset in PictureExportSize.allCases {
+                let frame=preset.frame(in:viewport),size=preset.pixelSize(viewport:viewport.size)
+                XCTAssertEqual(frame.midX,viewport.midX,accuracy:1e-8)
+                XCTAssertEqual(frame.midY,viewport.midY,accuracy:1e-8)
+                XCTAssertEqual(frame.width/frame.height,size.width/size.height,accuracy:1e-8)
+                XCTAssertLessThanOrEqual(frame.width,viewport.width+1e-8)
+                XCTAssertLessThanOrEqual(frame.height,viewport.height+1e-8)
+                XCTAssertTrue(abs(frame.width-viewport.width)<1e-8 || abs(frame.height-viewport.height)<1e-8)
+                if preset == .viewport { XCTAssertEqual(frame,viewport) }
+            }
         }
     }
     @MainActor func testPictureExportPresetsAndNativeRendering() async throws {

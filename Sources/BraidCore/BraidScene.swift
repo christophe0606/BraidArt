@@ -103,7 +103,7 @@ public final class BraidMetalView: SCNView {
         // transforms may still describe an earlier rendered frame when export is clicked.
         camera.transform=pointOfView.worldTransform
         frozen.rootNode.addChildNode(camera)
-        return BraidPictureCapture(scene:frozen,camera:camera,size:size)
+        return BraidPictureCapture(scene:frozen,camera:camera,size:size,viewport:bounds.size)
     }
     public func fit(columns:Int,rows:Int,oblique:Bool=false) {
         let aspect=Float(max(1,bounds.width)/max(1,bounds.height))
@@ -143,8 +143,11 @@ public final class BraidPictureCapture: @unchecked Sendable {
     private let scene:SCNScene
     private let camera:SCNNode
     private let size:CGSize
+    private let viewport:CGSize
     private let lock=NSLock()
-    fileprivate init(scene:SCNScene,camera:SCNNode,size:CGSize) { self.scene=scene;self.camera=camera;self.size=size }
+    fileprivate init(scene:SCNScene,camera:SCNNode,size:CGSize,viewport:CGSize) {
+        self.scene=scene;self.camera=camera;self.size=size;self.viewport=viewport
+    }
     fileprivate static func validate(size:CGSize) throws {
         guard size.width.isFinite,size.height.isFinite,(1...8192).contains(size.width),(1...8192).contains(size.height),
               size.width.rounded()==size.width,size.height.rounded()==size.height else {
@@ -158,7 +161,17 @@ public final class BraidPictureCapture: @unchecked Sendable {
         try Self.validate(size:size)
         guard let device=MTLCreateSystemDefaultDevice() else { throw BraidError.invalid("Metal is unavailable for picture export.") }
         let renderer=SCNRenderer(device:device,options:nil)
-        renderer.scene=scene;renderer.pointOfView=camera;renderer.autoenablesDefaultLighting=false
+        // Crop the frozen viewport to the same centered frame drawn over the live view.
+        // A wide frame is shorter than the viewport, so its vertical field of view shrinks.
+        // Copy the camera to keep repeated renders at different sizes independent.
+        let framedCamera=camera.clone()
+        framedCamera.camera=camera.camera?.copy() as? SCNCamera
+        let frame=PictureExportSize.frame(for:size,in:CGRect(origin:.zero,size:viewport))
+        if let projection=framedCamera.camera {
+            let halfAngle=projection.fieldOfView * .pi/360
+            projection.fieldOfView=atan(tan(halfAngle)*frame.height/viewport.height)*360 / .pi
+        }
+        renderer.scene=scene;renderer.pointOfView=framedCamera;renderer.autoenablesDefaultLighting=false
         let image=renderer.snapshot(atTime:0,with:size,antialiasingMode:.multisampling4X)
         try Task.checkCancellation()
         guard let cg=image.cgImage(forProposedRect:nil,context:nil,hints:nil),cg.width==Int(size.width),cg.height==Int(size.height) else {
