@@ -12,6 +12,13 @@ requires neither Mathematica nor Homebrew at runtime. This development build is
 locally signed, not notarized.
 The build registers `.braidart` files as **BraidArt Project** documents with
 macOS. Double-click a project in Finder to open it in BraidArt.
+The File menu follows the familiar macOS order: **Open…**, **Close**, **Save…**,
+then **Export**. **Help → BraidArt Help** introduces the app with a photograph of
+astronaut Eileen Collins: the original photograph, a cropped portrait, its woven
+picture and its 3D artwork. The NASA photograph is public domain, as documented
+by [scikit-image](https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut).
+The About window links to the [original photograph](https://flic.kr/p/r9qvLn)
+and NASA’s media usage guidelines.
 
 1. Choose **Open Image or Project**. Drag over the source to crop it; use **Reset
    Crop** to restore the full picture. Set the image width in tiles. The height
@@ -42,7 +49,7 @@ macOS. Double-click a project in Finder to open it in BraidArt.
    in the 3D view; older projects without a saved camera open in Result.
    The original full-resolution source picture is not embedded.
    All export commands are in **File → Export**, directly below
-   **Save Project…**. **Result as PNG…** renders a higher-resolution picture.
+   **Save…**. **Result as PNG…** renders a higher-resolution picture.
    **Solution and Tile Data…** creates a self-contained folder of JSON, Wolfram data and tile
    PNGs. The export dialog chooses a parent directory and creates a fresh child
    folder without overwriting an earlier export.

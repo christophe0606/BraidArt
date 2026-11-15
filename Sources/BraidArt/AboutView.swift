@@ -42,6 +42,22 @@ struct AboutView: View {
                             .font(.callout).fixedSize(horizontal:false,vertical:true)
                     }
                     Divider()
+                    VStack(alignment:.leading,spacing:9) {
+                        Text("Help illustrations").font(.headline)
+                        Text("Eileen Collins · Photograph: NASA, via scikit-image")
+                            .font(.callout.weight(.medium))
+                        Text("Public domain. The scikit-image image record identifies this photograph as having no known copyright restrictions.")
+                            .font(.callout).fixedSize(horizontal:false,vertical:true)
+                        HStack(spacing:16) {
+                            Link("Original NASA photograph",destination:URL(string:"https://flic.kr/p/r9qvLn")!)
+                            Link("Image record and rights",destination:URL(string:"https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut")!)
+                        }
+                        Text("The cropped portrait, woven picture and 3D artwork are adaptations made with BraidArt.")
+                            .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
+                        Link("NASA media usage guidelines",destination:URL(string:"https://www.nasa.gov/nasa-brand-center/images-and-media/")!)
+                            .font(.callout)
+                    }
+                    Divider()
                     VStack(alignment:.leading,spacing:12) {
                         Text("Included projects").font(.headline)
                         Text("Each project retains its own licenses. Original license texts, author notices and source references are included with the app.")

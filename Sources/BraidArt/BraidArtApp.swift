@@ -15,9 +15,14 @@ struct BraidArtApp: App {
         .defaultSize(width:1320,height:900)
         .commands {
             AboutMenuCommands()
+            HelpMenuCommands(showHelp:{ delegate.showHelp(nil) })
             CommandGroup(replacing:.newItem) {
-                Button("Open Image or Project…") { model.chooseImage() }.keyboardShortcut("o")
-                Button("Save Project…") { model.saveProject() }.keyboardShortcut("s").disabled(model.project == nil || model.busy)
+                Button("Open…") { model.chooseImage() }.keyboardShortcut("o").disabled(model.busy)
+            }
+            CommandGroup(replacing:.saveItem) {
+                Divider()
+                Button("Close") { NSApp.sendAction(#selector(NSWindow.performClose(_:)),to:nil,from:nil) }.keyboardShortcut("w")
+                Button("Save…") { model.saveProject() }.keyboardShortcut("s").disabled(model.project == nil || model.busy)
                 Menu("Export") {
                     Button("Result as PNG…") { model.exportPNG() }.disabled(model.project == nil || model.busy)
                     Button("3D View as PNG…") { model.export3DPicture() }.disabled(model.selectedTab != 3 || model.curves == nil || model.busy)
@@ -36,6 +41,15 @@ struct BraidArtApp: App {
     }
 }
 
+struct HelpMenuCommands: Commands {
+    let showHelp:()->Void
+    var body: some Commands {
+        CommandGroup(replacing:.help) {
+            Button("BraidArt Help",action:showHelp).keyboardShortcut("?",modifiers:.command)
+        }
+    }
+}
+
 struct AboutMenuCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     var body: some Commands {
@@ -44,11 +58,79 @@ struct AboutMenuCommands: Commands {
         }
     }
 }
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var helpWindow:NSWindow?
+    private let helpNavigation=HelpNavigation()
+    private let systemHelpMenu=NSMenu(title:"Help")
+    private var helpSearchResults=[NSMenuItem]()
+    private lazy var nativeHelpMenu:NSMenu = {
+        let menu=NSMenu(title:"Help")
+        menu.autoenablesItems=false
+        let searchView=NSView(frame:NSRect(x:0,y:0,width:320,height:34))
+        let label=NSTextField(labelWithString:"Search")
+        label.frame=NSRect(x:14,y:9,width:48,height:18)
+        let search=NSSearchField(frame:NSRect(x:68,y:5,width:238,height:24))
+        search.setAccessibilityLabel("Search BraidArt Help")
+        search.sendsSearchStringImmediately=true
+        search.target=self;search.action=#selector(searchHelp(_:))
+        searchView.addSubview(label);searchView.addSubview(search)
+        let searchItem=NSMenuItem();searchItem.view=searchView
+        menu.addItem(searchItem);menu.addItem(.separator())
+        let item=NSMenuItem(title:"BraidArt Help",action:#selector(showHelp(_:)),keyEquivalent:"?")
+        item.target=self;item.keyEquivalentModifierMask=[.command]
+        menu.addItem(item)
+        return menu
+    }()
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.applicationIconImage=AppIcon.image
         NSApp.dockTile.display()
+        NSApp.activate(ignoringOtherApps:true)
+    }
+    func applicationDidUpdate(_ notification:Notification) {
+        // A native search field searches the short introduction and opens its matching section.
+        guard let item=NSApp.mainMenu?.items.first(where: { $0.title=="Help" }),
+              item.submenu !== nativeHelpMenu else { return }
+        item.submenu=nativeHelpMenu
+        // The visible menu supplies its own topic search, so suppress a second system field.
+        NSApp.helpMenu=systemHelpMenu
+    }
+    @objc func showHelp(_ sender:Any?) {
+        openHelp(at:.overview)
+    }
+    @objc private func searchHelp(_ sender:NSSearchField) {
+        for item in helpSearchResults { nativeHelpMenu.removeItem(item) }
+        helpSearchResults=[]
+        let query=sender.stringValue.trimmingCharacters(in:.whitespacesAndNewlines)
+        if !query.isEmpty {
+            for topic in HelpTopic.matching(query) {
+                let item=NSMenuItem(title:topic.title,action:#selector(showHelpTopic(_:)),keyEquivalent:"")
+                item.target=self;item.representedObject=topic.rawValue
+                helpSearchResults.append(item)
+            }
+            if helpSearchResults.isEmpty {
+                let item=NSMenuItem(title:"No Help Topics Found",action:nil,keyEquivalent:"")
+                item.isEnabled=false;helpSearchResults=[item]
+            }
+        }
+        for (index,item) in helpSearchResults.enumerated() { nativeHelpMenu.insertItem(item,at:index+1) }
+    }
+    @objc private func showHelpTopic(_ sender:NSMenuItem) {
+        guard let name=sender.representedObject as? String,let topic=HelpTopic(rawValue:name) else { return }
+        openHelp(at:topic)
+    }
+    private func openHelp(at topic:HelpTopic) {
+        if helpWindow == nil {
+            let window=NSWindow(contentRect:NSRect(x:0,y:0,width:860,height:780),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
+            window.title="BraidArt Help";window.minSize=NSSize(width:720,height:580)
+            window.contentView=NSHostingView(rootView:HelpView(navigation:helpNavigation))
+            window.isReleasedWhenClosed=false;window.center()
+            window.setFrameAutosaveName("BraidArtHelp")
+            helpWindow=window
+        }
+        helpNavigation.show(topic)
+        helpWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps:true)
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication)->Bool { true }

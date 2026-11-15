@@ -18,5 +18,14 @@ archive URL and checksum. Licenses/README.md provides the full inventory.
 Numerical CIEDE2000 validation data is attributed to Gaurav Sharma, Wencheng Wu
 and Edul N. Dalal; see Licenses/README.md for the original data URL and citation.
 
+The Help example photograph depicts Eileen Collins and is credited to NASA,
+via scikit-image. The scikit-image record identifies it as public domain, with
+no known copyright restrictions:
+https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut
+Original photograph: https://flic.kr/p/r9qvLn
+NASA media usage guidelines:
+https://www.nasa.gov/nasa-brand-center/images-and-media/
+The cropped portrait, woven picture and 3D artwork are BraidArt adaptations.
+
 In the macOS app bundle, this NOTICE and LICENSE are in Contents/Resources/.
 Third-party notices and source URLs are in Contents/Resources/Solver/licenses/.
