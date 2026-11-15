@@ -62,7 +62,7 @@ struct HelpView: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:28) {
                     HStack(spacing:16) {
-                        Image(nsImage:AppIcon.image).resizable().frame(width:64,height:64).accessibilityHidden(true)
+                        Image(nsImage:AppIcon.image).resizable().interpolation(.low).frame(width:64,height:64).accessibilityHidden(true)
                         VStack(alignment:.leading,spacing:5) {
                             Text("BraidArt Help").font(.largeTitle.weight(.semibold))
                             Text("Turn a picture into woven art.").font(.title3).foregroundStyle(.secondary)

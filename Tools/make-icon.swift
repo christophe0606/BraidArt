@@ -1,22 +1,34 @@
-import AppKit
-let size=1024
-let image=NSImage(size:NSSize(width:size,height:size))
-image.lockFocus()
-NSColor(calibratedRed:0.10,green:0.12,blue:0.15,alpha:1).setFill()
-NSBezierPath(roundedRect:NSRect(x:25,y:25,width:974,height:974),xRadius:210,yRadius:210).fill()
-let orange=NSColor(calibratedRed:0.96,green:0.53,blue:0.22,alpha:1)
-let cream=NSColor(calibratedRed:0.94,green:0.90,blue:0.79,alpha:1)
-func curve(_ points:[NSPoint],color:NSColor,width:CGFloat) {
- let path=NSBezierPath();path.move(to:points[0]);path.curve(to:points[3],controlPoint1:points[1],controlPoint2:points[2]);path.lineWidth=width;path.lineCapStyle = .round
- color.setStroke();path.stroke()
+import Foundation
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
+
+// Run from the repository root:
+// swift Tools/make-icon.swift Resources/AppIcon.png .build/AppIcon.iconset
+// iconutil -c icns .build/AppIcon.iconset -o Sources/BraidArt/Resources/AppIcon.icns
+let input=URL(fileURLWithPath:CommandLine.arguments.count>1 ? CommandLine.arguments[1] : "Resources/AppIcon.png")
+let output=URL(fileURLWithPath:CommandLine.arguments.count>2 ? CommandLine.arguments[2] : ".build/AppIcon.iconset",isDirectory:true)
+guard let source=CGImageSourceCreateWithURL(input as CFURL,nil),let image=CGImageSourceCreateImageAtIndex(source,0,nil),
+      image.width==image.height else { fatalError("Provide a square PNG icon master.") }
+try FileManager.default.createDirectory(at:output,withIntermediateDirectories:true)
+let colorSpace=CGColorSpace(name:CGColorSpace.sRGB)!
+for size in [16,32,128,256,512] {
+    for scale in [1,2] {
+        let pixels=size*scale
+        guard let context=CGContext(data:nil,width:pixels,height:pixels,bitsPerComponent:8,bytesPerRow:pixels*4,
+                                    space:colorSpace,bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            fatalError("Cannot create icon bitmap.")
+        }
+        // Preserve clean black/gray boundaries without bright resampling halos.
+        context.interpolationQuality = .low
+        context.draw(image,in:CGRect(x:0,y:0,width:pixels,height:pixels))
+        let suffix=scale==2 ? "@2x" : ""
+        let url=output.appendingPathComponent("icon_\(size)x\(size)\(suffix).png")
+        guard let resized=context.makeImage(),let destination=CGImageDestinationCreateWithURL(url as CFURL,UTType.png.identifier as CFString,1,nil) else {
+            fatalError("Cannot write icon bitmap.")
+        }
+        CGImageDestinationAddImage(destination,resized,nil)
+        guard CGImageDestinationFinalize(destination) else { fatalError("Could not save \(url.lastPathComponent).") }
+    }
 }
-let dark=NSColor(calibratedRed:0.10,green:0.12,blue:0.15,alpha:1)
-let a=[NSPoint(x:210,y:240),NSPoint(x:850,y:240),NSPoint(x:180,y:784),NSPoint(x:814,y:784)]
-let b=[NSPoint(x:210,y:784),NSPoint(x:850,y:784),NSPoint(x:180,y:240),NSPoint(x:814,y:240)]
-curve(a,color:orange,width:115);curve(b,color:dark,width:155);curve(b,color:cream,width:115)
-// A small repeat makes the knot read as a woven construction.
-curve([NSPoint(x:510,y:450),NSPoint(x:500,y:475),NSPoint(x:500,y:500),NSPoint(x:510,y:525)],color:dark,width:150)
-curve([NSPoint(x:510,y:450),NSPoint(x:500,y:475),NSPoint(x:500,y:500),NSPoint(x:510,y:525)],color:orange,width:110)
-image.unlockFocus()
-let bitmap=NSBitmapImageRep(data:image.tiffRepresentation!)!
-try bitmap.representation(using:.png,properties:[:])!.write(to:URL(fileURLWithPath:CommandLine.arguments[1]))
+print("Created \(output.path)")

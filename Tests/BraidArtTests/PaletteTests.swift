@@ -70,6 +70,7 @@ final class PaletteTests: XCTestCase {
 
     @MainActor func testExtractionUpdatesBackgroundAlongWithTheStrands() async throws {
         let model=AppModel()
+        model.settings.grayscale=false
         let color=RGB(0.18,0.42,0.73)
         model.prepared=PixelImage(width:4,height:1,pixels:Array(repeating:color,count:4))
         model.settings.background=RGB(1,0,1)
@@ -85,6 +86,7 @@ final class PaletteTests: XCTestCase {
 
     @MainActor func testExtractionImmediatelyAfterLuminanceToggleUsesCurrentAdjustments() async throws {
         let model=AppModel()
+        model.settings.grayscale=false
         let url=try XCTUnwrap(HelpIllustration.photograph.url)
         model.open(url:url)
         let openDeadline=ContinuousClock.now.advanced(by:.seconds(5))
@@ -108,6 +110,7 @@ final class PaletteTests: XCTestCase {
 
     @MainActor func testAccentExtractionUsesSampledProjectWhenOriginalIsUnavailable() async throws {
         let model=AppModel()
+        model.settings.grayscale=false
         XCTAssertTrue(model.paletteIncludeAccents)
         XCTAssertEqual(model.paletteCount,6)
         let skin=RGB(0.76,0.60,0.53),blue=RGB(0.36,0.48,0.54),white=RGB(0.88,0.89,0.90)

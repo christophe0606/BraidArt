@@ -17,7 +17,7 @@ struct AboutView: View {
             ScrollView {
                 VStack(alignment:.leading,spacing:22) {
                     HStack(alignment:.center,spacing:18) {
-                        Image(nsImage:AppIcon.image).resizable().interpolation(.high).frame(width:76,height:76)
+                        Image(nsImage:AppIcon.image).resizable().interpolation(.low).frame(width:76,height:76)
                             .accessibilityLabel("BraidArt app icon")
                         VStack(alignment:.leading,spacing:5) {
                             Text("BraidArt").font(.largeTitle.weight(.semibold))

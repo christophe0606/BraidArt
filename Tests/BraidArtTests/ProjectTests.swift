@@ -5,6 +5,7 @@ import XCTest
 final class ProjectTests:XCTestCase {
     @MainActor func testProjectSnapshotAndReopeningRestoreCameraAndFrame() async throws {
         let model=AppModel()
+        XCTAssertTrue(model.settings.grayscale,"New sessions start in luminance mode")
         var settings=Settings();settings.columns=8
         let data=TileData(settings:settings)
         let image=PixelImage(width:8,height:2,pixels:Array(repeating:.gray,count:16))
@@ -31,6 +32,7 @@ final class ProjectTests:XCTestCase {
             XCTAssertFalse(model.busy);XCTAssertNil(model.error)
         }
         model.open(url:url);await waitForOpen()
+        XCTAssertFalse(model.settings.grayscale,"Opening a saved color project restores its mode")
         XCTAssertEqual(model.settings.backgroundMinimumDistance,27)
         XCTAssertEqual(model.cameraState,camera);XCTAssertEqual(model.pictureExportSize,.instagramPortrait)
         XCTAssertEqual(model.selectedTab,3)

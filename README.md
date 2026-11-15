@@ -12,6 +12,10 @@ requires neither Mathematica nor Homebrew at runtime. This development build is
 locally signed, not notarized.
 The build registers `.braidart` files as **BraidArt Project** documents with
 macOS. Double-click a project in Finder to open it in BraidArt.
+Replace any older copy in `/Applications` with the newly built bundle so Finder
+uses the current icon and document declaration.
+Projects use the BraidArt icon. The document type is app-specific data rather
+than a text type, so it does not request Quick Look's JSON/text preview.
 The File menu follows the familiar macOS order: **Open…**, **Close**, **Save…**,
 then **Export**. **Help → BraidArt Help** introduces the app with a photograph of
 astronaut Eileen Collins: the original photograph, a cropped portrait, its woven
@@ -57,8 +61,9 @@ and NASA’s media usage guidelines.
    black-to-white range, without color casts.
    Edit any strand
    or the background with its color picker. The tile library shows all `4 × colors²`
-   combinations. **Luminance only**, contrast, brightness and alpha compositing
-   are applied before sampling.
+   combinations. New sessions start with **Luminance only** enabled; turn it off
+   for color artwork. Existing projects restore their saved mode. Luminance,
+   contrast, brightness and alpha compositing are applied before sampling.
 3. Click **Weave Image**. Parts are solved in the notebook's order with top and
    left continuity fixed by previous parts. Progress and Cancel remain available.
    Time and relative-gap limits support interactive use. Every returned part is
@@ -180,8 +185,16 @@ Choose **BraidArt → About BraidArt** for Christophe Favergeon's copyright,
 the project license, and included projects with their source links and license
 texts.
 
-The app icon is bundled as a Swift package resource and used explicitly in the
-Dock and About window, including when launching directly from VS Code or Xcode.
+The app icon uses exactly nine connected tiles in a 3 × 3 arrangement, with
+broad black and white strands on gray, rendered by BraidArt's own flat tile
+renderer. The tiny generated source is `Resources/IconSource.png`; the validated
+repeating source pattern is
+`Resources/IconPattern.braidart`. `Resources/AppIcon.png` is the cropped master.
+Every tile boundary and constant-color curve is checked before rendering.
+Regenerate the artwork and all macOS icon sizes with `Scripts/generate-icon.sh`.
+The generation details are recorded in `Resources/AppIcon.source.txt`.
+The same icon is bundled for the Dock, sidebar, About, Help and Finder documents,
+including when launching directly from VS Code or Xcode.
 
 Inspired by [*Opt Art: From Mathematical Optimization to Visual Design* by
 Robert Bosch](https://press.princeton.edu/books/hardcover/9780691164069/opt-art)

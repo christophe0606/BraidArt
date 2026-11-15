@@ -41,7 +41,10 @@ enum PaletteSeparation: String, CaseIterable, Identifiable {
 
 @MainActor
 final class AppModel: ObservableObject {
-    @Published var settings=BraidCore.Settings() {
+    @Published var settings:BraidCore.Settings = {
+        var settings=BraidCore.Settings();settings.grayscale=true
+        return settings
+    }() {
         didSet {
             // A resized palette must not reuse identities retained by old color pickers.
             if paletteIDs.count != settings.palette.count {

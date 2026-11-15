@@ -1,6 +1,6 @@
 import AppKit
 
-/// The same artwork is used for Swift package launches, the Dock and About.
+/// Shared artwork for the Dock, sidebar, About, Help and Finder documents.
 @MainActor
 enum AppIcon {
     static let image: NSImage = {

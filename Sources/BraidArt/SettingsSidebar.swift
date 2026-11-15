@@ -40,7 +40,7 @@ struct SettingsSidebar: View, Equatable {
         ScrollView {
             VStack(alignment:.leading,spacing:22) {
                 HStack(spacing:10) {
-                    Image(systemName:"circle.hexagongrid.fill").font(.system(size:29)).foregroundStyle(.orange)
+                    Image(nsImage:AppIcon.image).resizable().interpolation(.low).frame(width:40,height:40).accessibilityHidden(true)
                     VStack(alignment:.leading,spacing:2) { Text("BraidArt").font(.title2.bold());Text("IMAGE TO WOVEN TILES").font(.system(size:9,weight:.semibold,design:.monospaced)).tracking(1.5).foregroundStyle(.secondary) }
                 }.padding(.bottom,6)
                 section("01", "Picture") {

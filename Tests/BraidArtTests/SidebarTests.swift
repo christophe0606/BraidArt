@@ -57,6 +57,7 @@ final class SidebarTests: XCTestCase {
 
     @MainActor func testExtractionKeepsControlsEnabledAndUnrelatedUpdatesOutOfSidebar() async throws {
         let model=AppModel()
+        model.settings.grayscale=false
         model.prepared=PixelImage(width:4,height:1,pixels:[.black,.white,RGB(1,0,0),RGB(0,0,1)])
         let before=SidebarState(model:model)
         model.extractPalette()

@@ -172,6 +172,9 @@ public struct SolveResult: Codable, Equatable, Sendable {
     public var reports: [PartitionReport]
     public var costBackend: String
     public var elapsedSeconds: Double
+    public init(solution:[[Int]],reports:[PartitionReport],costBackend:String,elapsedSeconds:Double) {
+        self.solution=solution;self.reports=reports;self.costBackend=costBackend;self.elapsedSeconds=elapsedSeconds
+    }
     public var objective: Double { reports.reduce(0) { $0+$1.objective } }
     public var allPartitionsOptimal: Bool { reports.allSatisfy(\.provenOptimal) }
     public func validate(tileData: TileData) throws {
