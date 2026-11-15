@@ -1,11 +1,12 @@
 import XCTest
+import BraidCore
 @testable import BraidArt
 
 final class HelpTests:XCTestCase {
     func testHelpSearchFindsRelevantSectionsAndClearsEmptyQueries() {
         XCTAssertTrue(HelpTopic.matching("EILEEN COLLINS").contains(.picture))
-        XCTAssertTrue(HelpTopic.matching("crop").contains(.crop))
-        XCTAssertTrue(HelpTopic.matching("  export  ").contains(.sharing))
+        XCTAssertTrue(HelpTopic.matching(HelpTopic.crop.title.uppercased()).contains(.crop))
+        XCTAssertTrue(HelpTopic.matching("  \(L("Export"))  ").contains(.sharing))
         XCTAssertTrue(HelpTopic.matching("3D").contains(.sculpture))
         XCTAssertTrue(HelpTopic.matching("  ").isEmpty)
         XCTAssertTrue(HelpTopic.matching("missing-topic-123").isEmpty)

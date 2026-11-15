@@ -1,3 +1,4 @@
+import BraidCore
 import SwiftUI
 
 @MainActor
@@ -28,7 +29,7 @@ struct ExportProgressView: View {
             }
             HStack {
                 Spacer()
-                Button(export.cancelling ? "Cancelling…" : "Cancel",role:.cancel,action:cancel)
+                Button(export.cancelling ? L("Cancelling…") : L("Cancel"),role:.cancel,action:cancel)
                     .keyboardShortcut(.cancelAction)
                     .disabled(export.cancelling)
             }

@@ -68,7 +68,7 @@ public enum BackgroundExtractor {
         // regions cover the available background space, omit the fewest colors.
         var strandCount=options.map { $0.mask.nonzeroBitCount }.max() ?? 0
         guard strandCount>0 else {
-            throw BraidError.invalid("No background can meet the selected contrast with these strand colors. Lower Background contrast and extract again.")
+            throw BraidError.invalid(L("No background can meet the selected contrast with these strand colors. Lower Background contrast and extract again."))
         }
         let eligible=options.filter { $0.mask.nonzeroBitCount==strandCount }
         func approximateScore(_ background:RGB,mask:Int)->Double {

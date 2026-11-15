@@ -82,12 +82,12 @@ public final class BraidMetalView: SCNView {
     /// Capture the live viewport, preserving its camera, lighting, background and pixel scale.
     public func captureImage() throws -> CGImage {
         guard scene != nil, pointOfView != nil, bounds.width>0, bounds.height>0 else {
-            throw BraidError.invalid("Open a 3D rendering before exporting its picture.")
+            throw BraidError.invalid(L("Open a 3D rendering before exporting its picture."))
         }
         SCNTransaction.flush()
         let image=snapshot()
         guard let cg=image.cgImage(forProposedRect:nil,context:nil,hints:nil) else {
-            throw BraidError.invalid("Cannot capture the current 3D rendering.")
+            throw BraidError.invalid(L("Cannot capture the current 3D rendering."))
         }
         return cg
     }
@@ -99,7 +99,7 @@ public final class BraidMetalView: SCNView {
     /// Freeze an independent scene and camera for a background render at the requested pixel size.
     public func makePictureCapture(size:CGSize? = nil) throws -> BraidPictureCapture {
         guard let scene,let pointOfView,let sourceCamera=pointOfView.camera,bounds.width>0,bounds.height>0 else {
-            throw BraidError.invalid("Open a 3D rendering before exporting its picture.")
+            throw BraidError.invalid(L("Open a 3D rendering before exporting its picture."))
         }
         let size=size ?? viewportPixelSize
         try BraidPictureCapture.validate(size:size)
@@ -164,7 +164,7 @@ public final class BraidPictureCapture: @unchecked Sendable {
     fileprivate static func validate(size:CGSize) throws {
         guard size.width.isFinite,size.height.isFinite,(1...8192).contains(size.width),(1...8192).contains(size.height),
               size.width.rounded()==size.width,size.height.rounded()==size.height else {
-            throw BraidError.invalid("Picture dimensions must be whole pixels between 1 and 8192.")
+            throw BraidError.invalid(L("Picture dimensions must be whole pixels between 1 and 8192."))
         }
     }
     public func render(size:CGSize? = nil) throws -> CGImage {
@@ -172,7 +172,7 @@ public final class BraidPictureCapture: @unchecked Sendable {
         try Task.checkCancellation()
         let size=size ?? self.size
         try Self.validate(size:size)
-        guard let device=MTLCreateSystemDefaultDevice() else { throw BraidError.invalid("Metal is unavailable for picture export.") }
+        guard let device=MTLCreateSystemDefaultDevice() else { throw BraidError.invalid(L("Metal is unavailable for picture export.")) }
         let renderer=SCNRenderer(device:device,options:nil)
         // Crop the frozen viewport to the same centered frame drawn over the live view.
         // A wide frame is shorter than the viewport, so its vertical field of view shrinks.
@@ -188,7 +188,7 @@ public final class BraidPictureCapture: @unchecked Sendable {
         let image=renderer.snapshot(atTime:0,with:size,antialiasingMode:.multisampling4X)
         try Task.checkCancellation()
         guard let cg=image.cgImage(forProposedRect:nil,context:nil,hints:nil),cg.width==Int(size.width),cg.height==Int(size.height) else {
-            throw BraidError.invalid("Cannot render the selected picture size.")
+            throw BraidError.invalid(L("Cannot render the selected picture size."))
         }
         return cg
     }

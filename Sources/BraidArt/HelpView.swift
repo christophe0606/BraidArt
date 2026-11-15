@@ -1,3 +1,4 @@
+import BraidCore
 import SwiftUI
 import AppKit
 
@@ -5,22 +6,22 @@ enum HelpTopic:String,CaseIterable {
     case overview,picture,crop,woven,sculpture,sharing
     var title:String {
         switch self {
-        case .overview: return "BraidArt Help"
-        case .picture: return "Start with a picture"
-        case .crop: return "Focus on what matters"
-        case .woven: return "See it woven"
-        case .sculpture: return "Explore another dimension"
-        case .sharing: return "Make it your own"
+        case .overview: return L("BraidArt Help")
+        case .picture: return L("Start with a picture")
+        case .crop: return L("Focus on what matters")
+        case .woven: return L("See it woven")
+        case .sculpture: return L("Explore another dimension")
+        case .sharing: return L("Make it your own")
         }
     }
     var text:String {
         switch self {
-        case .overview: return "BraidArt transforms photographs and illustrations into patterns of interlacing strands. From a distance, the strands reveal your picture. Up close, they form a world of curves, crossings and loops."
-        case .picture: return "Choose a portrait, a landscape or any picture you love. This example starts with NASA’s photograph of astronaut Eileen Collins."
-        case .crop: return "Crop the picture to bring your subject closer. Here, a black-and-white crop of Eileen Collins’s face becomes the starting point for the artwork."
-        case .woven: return "BraidArt reimagines the light, dark and color in your picture as connected strands, creating a new way to see a familiar image."
-        case .sculpture: return "The same woven picture can become a 3D sculpture. Turn it around, move closer and discover how the strands pass over and under one another."
-        case .sharing: return "Try different colors and levels of detail to find a look you like. Save your project to return to it later, or choose File → Export to keep and share your artwork as a picture or a 3D object."
+        case .overview: return L("BraidArt transforms photographs and illustrations into patterns of interlacing strands. From a distance, the strands reveal your picture. Up close, they form a world of curves, crossings and loops.")
+        case .picture: return L("Choose a portrait, a landscape or any picture you love. This example starts with NASA’s photograph of astronaut Eileen Collins.")
+        case .crop: return L("Crop the picture to bring your subject closer. Here, a black-and-white crop of Eileen Collins’s face becomes the starting point for the artwork.")
+        case .woven: return L("BraidArt reimagines the light, dark and color in your picture as connected strands, creating a new way to see a familiar image.")
+        case .sculpture: return L("The same woven picture can become a 3D sculpture. Turn it around, move closer and discover how the strands pass over and under one another.")
+        case .sharing: return L("Try different colors and levels of detail to find a look you like. Save your project to return to it later, or choose File → Export to keep and share your artwork as a picture or a 3D object.")
         }
     }
     static func matching(_ query:String)->[HelpTopic] {
@@ -46,10 +47,10 @@ enum HelpIllustration: String, CaseIterable {
     var image:NSImage? { url.flatMap { NSImage(contentsOf:$0) } }
     var description:String {
         switch self {
-        case .photograph: return "Original NASA color photograph of astronaut Eileen Collins"
-        case .crop: return "Cropped black-and-white view of Eileen Collins’s face"
-        case .woven: return "Eileen Collins’s face recreated with black and white interlacing strands"
-        case .sculpture: return "An angled view of Eileen Collins’s face as a sculpture of woven strands"
+        case .photograph: return L("Original NASA color photograph of astronaut Eileen Collins")
+        case .crop: return L("Cropped black-and-white view of Eileen Collins’s face")
+        case .woven: return L("Eileen Collins’s face recreated with black and white interlacing strands")
+        case .sculpture: return L("An angled view of Eileen Collins’s face as a sculpture of woven strands")
         }
     }
 }
@@ -64,8 +65,8 @@ struct HelpView: View {
                     HStack(spacing:16) {
                         Image(nsImage:AppIcon.image).resizable().interpolation(.low).frame(width:64,height:64).accessibilityHidden(true)
                         VStack(alignment:.leading,spacing:5) {
-                            Text("BraidArt Help").font(.largeTitle.weight(.semibold))
-                            Text("Turn a picture into woven art.").font(.title3).foregroundStyle(.secondary)
+                            Text(L("BraidArt Help")).font(.largeTitle.weight(.semibold))
+                            Text(L("Turn a picture into woven art.")).font(.title3).foregroundStyle(.secondary)
                         }
                     }.id(HelpTopic.overview)
                     Text(HelpTopic.overview.text)
@@ -100,9 +101,9 @@ struct HelpView: View {
             }
             Divider()
             HStack {
-                Text("A picture. A pattern. A sculpture.").font(.callout).foregroundStyle(.secondary)
+                Text(L("A picture. A pattern. A sculpture.")).font(.callout).foregroundStyle(.secondary)
                 Spacer()
-                Button("Done") { NSApp.keyWindow?.performClose(nil) }.keyboardShortcut(.cancelAction)
+                Button(L("Done")) { NSApp.keyWindow?.performClose(nil) }.keyboardShortcut(.cancelAction)
             }.padding(16)
         }
         .frame(minWidth:720,minHeight:580)

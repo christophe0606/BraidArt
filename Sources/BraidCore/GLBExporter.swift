@@ -19,7 +19,7 @@ public enum GLBExporter {
         func linear(_ c:Double)->Double { c<=0.04045 ? c/12.92 : pow((c+0.055)/1.055,2.4) }
         for mesh in meshes where !mesh.indices.isEmpty {
             guard mesh.positions.count==mesh.normals.count,mesh.indices.allSatisfy({Int($0)<mesh.positions.count}),mesh.color.valid,
-                  mesh.positions.allSatisfy({$0.x.isFinite && $0.y.isFinite && $0.z.isFinite}) else { throw BraidError.invalid("Invalid 3D mesh.") }
+                  mesh.positions.allSatisfy({$0.x.isFinite && $0.y.isFinite && $0.z.isFinite}) else { throw BraidError.invalid(L("Invalid 3D mesh.")) }
             let pos=floats(mesh.positions,bounds:true),norm=floats(mesh.normals,bounds:false),offset=binary.count
             for i in mesh.indices { append32(i,to:&binary) }
             views.append(["buffer":0,"byteOffset":offset,"byteLength":binary.count-offset,"target":34963])

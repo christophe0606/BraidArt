@@ -56,7 +56,7 @@ final class BackgroundTests:XCTestCase {
         var settings=Settings();settings.grayscale=true;settings.palette=[RGB(0.46,0.46,0.46)]
         settings.backgroundMinimumDistance=50
         XCTAssertThrowsError(try BackgroundExtractor.matching(image,settings:settings)) { error in
-            XCTAssertTrue(error.localizedDescription.contains("Lower Background contrast"))
+            XCTAssertEqual(error.localizedDescription,L("No background can meet the selected contrast with these strand colors. Lower Background contrast and extract again."))
         }
     }
 

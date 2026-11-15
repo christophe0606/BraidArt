@@ -17,6 +17,10 @@ Scripts/package-licenses.sh "$APP/Contents/Resources/Solver"
 cp LICENSE NOTICE "$APP/Contents/Resources/"
 cp Docs/Licensing.md "$APP/Contents/Resources/"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
+for language in en fr; do
+    mkdir -p "$APP/Contents/Resources/$language.lproj"
+    cp "Resources/$language.lproj/InfoPlist.strings" "$APP/Contents/Resources/$language.lproj/"
+done
 cp Sources/BraidArt/Resources/AppIcon.icns "$APP/Contents/Resources/BraidArtIcon.icns"
 rm -f "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$APP/Contents/Resources/Solver/bin/cbc"

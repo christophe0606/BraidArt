@@ -101,8 +101,8 @@ struct CropEditor: View {
         .onDeleteCommand { if hasSelection { onDelete() } }
         .onChange(of:hasSelection) { _,_ in draft=nil;drag=nil;scaleStart=nil }
         .onChange(of:crop) { _,_ in draft=nil;drag=nil;scaleStart=nil }
-        .accessibilityLabel("Crop editor")
-        .accessibilityHint("Drag inside the crop to move it, or drag one of its eight handles to resize. Pinch to scale. Press Delete to clear the crop.")
+        .accessibilityLabel(L("Crop editor"))
+        .accessibilityHint(L("Drag inside the crop to move it, or drag one of its eight handles to resize. Pinch to scale. Press Delete to clear the crop."))
     }
 
     private func commit() {

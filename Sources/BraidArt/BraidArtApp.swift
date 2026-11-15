@@ -17,23 +17,23 @@ struct BraidArtApp: App {
             AboutMenuCommands()
             HelpMenuCommands(showHelp:{ delegate.showHelp(nil) })
             CommandGroup(replacing:.newItem) {
-                Button("Open…") { model.chooseImage() }.keyboardShortcut("o").disabled(model.busy)
+                Button(L("Open…")) { model.chooseImage() }.keyboardShortcut("o").disabled(model.busy)
             }
             CommandGroup(replacing:.saveItem) {
                 Divider()
-                Button("Close") { NSApp.sendAction(#selector(NSWindow.performClose(_:)),to:nil,from:nil) }.keyboardShortcut("w")
-                Button("Save…") { model.saveProject() }.keyboardShortcut("s").disabled(model.project == nil || model.busy)
-                Menu("Export") {
-                    Button("Result as PNG…") { model.exportPNG() }.disabled(model.project == nil || model.busy)
-                    Button("3D View as PNG…") { model.export3DPicture() }.disabled(model.selectedTab != 3 || model.curves == nil || model.busy)
-                    Button("Vector PDF…") { model.exportPDF() }.disabled(model.curves == nil || model.busy)
-                    Button("3D Object (GLB)…") { model.exportGLB() }.disabled(model.curves == nil || model.busy)
-                    Button("3D Object (USDZ)…") { model.exportUSDZ() }.disabled(model.curves == nil || model.busy)
-                    Button("Solution and Tile Data…") { model.exportData() }.disabled(model.project == nil || model.busy)
+                Button(L("Close")) { NSApp.sendAction(#selector(NSWindow.performClose(_:)),to:nil,from:nil) }.keyboardShortcut("w")
+                Button(L("Save…")) { model.saveProject() }.keyboardShortcut("s").disabled(model.project == nil || model.busy)
+                Menu(L("Export")) {
+                    Button(L("Result as PNG…")) { model.exportPNG() }.disabled(model.project == nil || model.busy)
+                    Button(L("3D View as PNG…")) { model.export3DPicture() }.disabled(model.selectedTab != 3 || model.curves == nil || model.busy)
+                    Button(L("Vector PDF…")) { model.exportPDF() }.disabled(model.curves == nil || model.busy)
+                    Button(L("3D Object (GLB)…")) { model.exportGLB() }.disabled(model.curves == nil || model.busy)
+                    Button(L("3D Object (USDZ)…")) { model.exportUSDZ() }.disabled(model.curves == nil || model.busy)
+                    Button(L("Solution and Tile Data…")) { model.exportData() }.disabled(model.project == nil || model.busy)
                 }
             }
         }
-        Window("About BraidArt",id:"about") {
+        Window(L("About BraidArt"),id:"about") {
             AboutView()
         }
         .windowResizability(.contentSize)
@@ -45,7 +45,7 @@ struct HelpMenuCommands: Commands {
     let showHelp:()->Void
     var body: some Commands {
         CommandGroup(replacing:.help) {
-            Button("BraidArt Help",action:showHelp).keyboardShortcut("?",modifiers:.command)
+            Button(L("BraidArt Help"),action:showHelp).keyboardShortcut("?",modifiers:.command)
         }
     }
 }
@@ -54,7 +54,7 @@ struct AboutMenuCommands: Commands {
     @Environment(\.openWindow) private var openWindow
     var body: some Commands {
         CommandGroup(replacing:.appInfo) {
-            Button("About BraidArt") { openWindow(id:"about") }
+            Button(L("About BraidArt")) { openWindow(id:"about") }
         }
     }
 }
@@ -62,22 +62,24 @@ struct AboutMenuCommands: Commands {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var helpWindow:NSWindow?
     private let helpNavigation=HelpNavigation()
-    private let systemHelpMenu=NSMenu(title:"Help")
+    private let systemHelpMenu=NSMenu(title:L("Help"))
     private var helpSearchResults=[NSMenuItem]()
     private lazy var nativeHelpMenu:NSMenu = {
-        let menu=NSMenu(title:"Help")
+        let menu=NSMenu(title:L("Help"))
         menu.autoenablesItems=false
         let searchView=NSView(frame:NSRect(x:0,y:0,width:320,height:34))
-        let label=NSTextField(labelWithString:"Search")
-        label.frame=NSRect(x:14,y:9,width:48,height:18)
-        let search=NSSearchField(frame:NSRect(x:68,y:5,width:238,height:24))
-        search.setAccessibilityLabel("Search BraidArt Help")
+        let label=NSTextField(labelWithString:L("Search"))
+        label.sizeToFit()
+        label.setFrameOrigin(NSPoint(x:14,y:9))
+        let searchX=label.frame.maxX+8
+        let search=NSSearchField(frame:NSRect(x:searchX,y:5,width:306-searchX,height:24))
+        search.setAccessibilityLabel(L("Search BraidArt Help"))
         search.sendsSearchStringImmediately=true
         search.target=self;search.action=#selector(searchHelp(_:))
         searchView.addSubview(label);searchView.addSubview(search)
         let searchItem=NSMenuItem();searchItem.view=searchView
         menu.addItem(searchItem);menu.addItem(.separator())
-        let item=NSMenuItem(title:"BraidArt Help",action:#selector(showHelp(_:)),keyEquivalent:"?")
+        let item=NSMenuItem(title:L("BraidArt Help"),action:#selector(showHelp(_:)),keyEquivalent:"?")
         item.target=self;item.keyEquivalentModifierMask=[.command]
         menu.addItem(item)
         return menu
@@ -90,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationDidUpdate(_ notification:Notification) {
         // A native search field searches the short introduction and opens its matching section.
-        guard let item=NSApp.mainMenu?.items.first(where: { $0.title=="Help" }),
+        guard let item=NSApp.mainMenu?.items.first(where: { $0.title==L("Help") }),
               item.submenu !== nativeHelpMenu else { return }
         item.submenu=nativeHelpMenu
         // The visible menu supplies its own topic search, so suppress a second system field.
@@ -110,7 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 helpSearchResults.append(item)
             }
             if helpSearchResults.isEmpty {
-                let item=NSMenuItem(title:"No Help Topics Found",action:nil,keyEquivalent:"")
+                let item=NSMenuItem(title:L("No Help Topics Found"),action:nil,keyEquivalent:"")
                 item.isEnabled=false;helpSearchResults=[item]
             }
         }
@@ -123,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func openHelp(at topic:HelpTopic) {
         if helpWindow == nil {
             let window=NSWindow(contentRect:NSRect(x:0,y:0,width:860,height:780),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
-            window.title="BraidArt Help";window.minSize=NSSize(width:720,height:580)
+            window.title=L("BraidArt Help");window.minSize=NSSize(width:720,height:580)
             window.contentView=NSHostingView(rootView:HelpView(navigation:helpNavigation))
             window.isReleasedWhenClosed=false;window.center()
             window.setFrameAutosaveName("BraidArtHelp")

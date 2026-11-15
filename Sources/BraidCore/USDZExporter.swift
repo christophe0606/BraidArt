@@ -7,20 +7,20 @@ public enum USDZExporter {
     public static func write(meshes:[TubeMesh],to url:URL,
                              progress:(Double,String)->Void = { _,_ in }) throws {
         try Task.checkCancellation()
-        progress(0,"Preparing USDZ geometry…")
+        progress(0,L("Preparing USDZ geometry…"))
         let meshes=meshes.filter { !$0.indices.isEmpty }
-        guard !meshes.isEmpty else { throw BraidError.invalid("There is no 3D geometry to export.") }
+        guard !meshes.isEmpty else { throw BraidError.invalid(L("There is no 3D geometry to export.")) }
         var minimum=SIMD3<Float>(repeating:.infinity),maximum=SIMD3<Float>(repeating: -.infinity)
         for mesh in meshes {
             try Task.checkCancellation()
             guard !mesh.positions.isEmpty,mesh.positions.count==mesh.normals.count,mesh.indices.count%3==0,
                   mesh.indices.allSatisfy({Int($0)<mesh.positions.count}),mesh.color.valid,
                   mesh.normals.allSatisfy({$0.x.isFinite && $0.y.isFinite && $0.z.isFinite}) else {
-                throw BraidError.invalid("Invalid 3D mesh.")
+                throw BraidError.invalid(L("Invalid 3D mesh."))
             }
             for (index,p) in mesh.positions.enumerated() {
                 if index%4096==0 { try Task.checkCancellation() }
-                guard p.x.isFinite,p.y.isFinite,p.z.isFinite else { throw BraidError.invalid("Invalid 3D mesh.") }
+                guard p.x.isFinite,p.y.isFinite,p.z.isFinite else { throw BraidError.invalid(L("Invalid 3D mesh.")) }
                 minimum=simd_min(minimum,p);maximum=simd_max(maximum,p)
             }
         }
@@ -37,7 +37,7 @@ public enum USDZExporter {
                 try Task.checkCancellation()
                 let now=ProcessInfo.processInfo.systemUptime
                 if now-lastReport>=0.1 {
-                    progress(0.85*Double(completed)/Double(total),"Writing colored USDZ meshes…");lastReport=now
+                    progress(0.85*Double(completed)/Double(total),L("Writing colored USDZ meshes…"));lastReport=now
                 }
             }
         }
@@ -106,19 +106,19 @@ public enum USDZExporter {
         }
         try writer.append("}\n");try writer.finish()
         try Task.checkCancellation()
-        progress(0.85,"Packaging USDZ…")
+        progress(0.85,L("Packaging USDZ…"))
         let package=folder.appendingPathComponent("BraidArt.usdz")
         try packageLayer(layer,to:package,size:writer.size,checksum:writer.checksum)
-        progress(0.97,"Saving USDZ…")
+        progress(0.97,L("Saving USDZ…"))
         let data=try Data(contentsOf:package,options:.mappedIfSafe)
         try Task.checkCancellation()
         try data.write(to:url,options:.atomic)
-        progress(1,"USDZ saved.")
+        progress(1,L("USDZ saved."))
     }
 
     /// USDZ stores uncompressed ZIP entries with each payload aligned to 64 bytes.
     private static func packageLayer(_ layer:URL,to url:URL,size:UInt64,checksum:UInt32) throws {
-        guard size<UInt32.max-1024 else { throw BraidError.invalid("This USDZ object exceeds the supported 4 GB package size.") }
+        guard size<UInt32.max-1024 else { throw BraidError.invalid(L("This USDZ object exceeds the supported 4 GB package size.")) }
         let name=Data("BraidArt.usda".utf8)
         let padding=(64-(30+name.count)%64)%64
         var local=Data(),central=Data(),end=Data()
@@ -135,7 +135,7 @@ public enum USDZExporter {
         u32(0,&central);u32(0,&central);central.append(name)
         u32(0x06054b50,&end);u16(0,&end);u16(0,&end);u16(1,&end);u16(1,&end)
         u32(UInt32(central.count),&end);u32(UInt32(local.count)+UInt32(size),&end);u16(0,&end)
-        guard FileManager.default.createFile(atPath:url.path,contents:nil) else { throw BraidError.invalid("Cannot create the USDZ package.") }
+        guard FileManager.default.createFile(atPath:url.path,contents:nil) else { throw BraidError.invalid(L("Cannot create the USDZ package.")) }
         let output=try FileHandle(forWritingTo:url),input=try FileHandle(forReadingFrom:layer)
         defer { try? output.close();try? input.close() }
         try output.write(contentsOf:local)
@@ -153,7 +153,7 @@ private final class USDTextWriter {
     private(set) var checksum:UInt32=0
     private(set) var size:UInt64=0
     init(url:URL) throws {
-        guard FileManager.default.createFile(atPath:url.path,contents:nil) else { throw BraidError.invalid("Cannot create the USD geometry file.") }
+        guard FileManager.default.createFile(atPath:url.path,contents:nil) else { throw BraidError.invalid(L("Cannot create the USD geometry file.")) }
         handle=try FileHandle(forWritingTo:url)
     }
     deinit { try? handle.close() }

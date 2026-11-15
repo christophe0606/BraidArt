@@ -40,7 +40,7 @@ public enum PartitionSolver {
               left == nil || left?.count==block.height,top == nil || top?.count==block.width,
               costs.tileCount==data.allTiles.count,costs.values.count==image.width*image.height*costs.tileCount,
               (left ?? []).allSatisfy({data.allTiles.indices.contains($0-1)}),
-              (top ?? []).allSatisfy({data.allTiles.indices.contains($0-1)}) else { throw BraidError.invalid("Invalid partition or boundary dimensions.") }
+              (top ?? []).allSatisfy({data.allTiles.indices.contains($0-1)}) else { throw BraidError.invalid(L("Invalid partition or boundary dimensions.")) }
         let n=data.allTiles.count
         func v(_ cell: Int,_ tileID: Int)->String { "x\(cell)_\(tileID)" }
         func terms(_ cell: Int,_ ids: [Int],_ sign: String = "+") -> String { ids.map{"\(sign) \(v(cell,$0))"}.joined(separator:" ") }
@@ -78,7 +78,7 @@ public enum PartitionSolver {
             let lc: Int? = c>0 ? data.allTiles[seed[cell-1]-1].right : left.map{data.allTiles[$0[r]-1].right}
             let tc: Int? = r>0 ? data.allTiles[seed[cell-block.width]-1].bottom : top.map{data.allTiles[$0[c]-1].bottom}
             let candidates=data.allTiles.filter{(lc==nil || $0.left==lc) && (tc==nil || $0.top==tc)}
-            guard let best=candidates.min(by:{costs[p,$0.id-1]<costs[p,$1.id-1]}) else { throw BraidError.invalid("Partition boundaries are infeasible.") }
+            guard let best=candidates.min(by:{costs[p,$0.id-1]<costs[p,$1.id-1]}) else { throw BraidError.invalid(L("Partition boundaries are infeasible.")) }
             seed[cell]=best.id
             for tile in data.allTiles { warm.append("\(cell*n+tile.id-1) \(v(cell,tile.id)) \(tile.id==best.id ? 1 : 0)") }
         }}
@@ -89,7 +89,7 @@ public enum PartitionSolver {
         let header=lines.first ?? ""
         let lower=header.lowercased()
         guard (lower.hasPrefix("optimal") || lower.hasPrefix("stopped")), !lower.contains("no integer"), !lower.contains("infeasible"), !lower.contains("unbounded") else {
-            throw BraidError.invalid("CBC did not return an integer solution: \(header)")
+            throw BraidError.invalid(L("CBC did not return an integer solution: %@", String(describing: header)))
         }
         let count=problem.block.width*problem.block.height,n=data.allTiles.count
         var values=[Double](repeating:0,count:count*n),seen=Set<Int>()
@@ -98,22 +98,22 @@ public enum PartitionSolver {
             guard let nameIndex=fields.firstIndex(where:{$0.hasPrefix("x")}),nameIndex+1<fields.count else { continue }
             let name=fields[nameIndex].dropFirst().split(separator:"_")
             guard name.count==2,let cell=Int(name[0]),let tile=Int(name[1]),(0..<count).contains(cell),(1...n).contains(tile),
-                  let value=Double(fields[nameIndex+1]),value.isFinite,abs(value-value.rounded())<1e-5,(-1e-5...1.00001).contains(value) else { throw BraidError.invalid("CBC returned malformed or fractional tile choices.") }
+                  let value=Double(fields[nameIndex+1]),value.isFinite,abs(value-value.rounded())<1e-5,(-1e-5...1.00001).contains(value) else { throw BraidError.invalid(L("CBC returned malformed or fractional tile choices.")) }
             let index=cell*n+tile-1
-            guard seen.insert(index).inserted else { throw BraidError.invalid("CBC returned duplicate variables.") }
+            guard seen.insert(index).inserted else { throw BraidError.invalid(L("CBC returned duplicate variables.")) }
             values[index]=value.rounded()
         }
         var ids=[Int]()
         for cell in 0..<count {
             let selected=(0..<n).filter{values[cell*n+$0]==1}
-            guard selected.count==1 else { throw BraidError.invalid("CBC did not select exactly one tile per pixel.") }
+            guard selected.count==1 else { throw BraidError.invalid(L("CBC did not select exactly one tile per pixel.")) }
             ids.append(selected[0]+1)
         }
         let w=problem.block.width,h=problem.block.height
         let rows=(0..<h).map{Array(ids[($0*w)..<(($0+1)*w)])}
         try SolveResult(solution:rows,reports:[],costBackend:"",elapsedSeconds:0).validate(tileData:data)
-        for r in 0..<h { if let left=problem.left, data.allTiles[left[r]-1].right != data.allTiles[rows[r][0]-1].left { throw BraidError.invalid("CBC violated the left partition boundary.") } }
-        for c in 0..<w { if let top=problem.top, data.allTiles[top[c]-1].bottom != data.allTiles[rows[0][c]-1].top { throw BraidError.invalid("CBC violated the top partition boundary.") } }
+        for r in 0..<h { if let left=problem.left, data.allTiles[left[r]-1].right != data.allTiles[rows[r][0]-1].left { throw BraidError.invalid(L("CBC violated the left partition boundary.")) } }
+        for c in 0..<w { if let top=problem.top, data.allTiles[top[c]-1].bottom != data.allTiles[rows[0][c]-1].top { throw BraidError.invalid(L("CBC violated the top partition boundary.")) } }
         // CBC may say 'Optimal (within gap tolerance)': that is feasible, not proven exact.
         return (ids,lower.hasPrefix("optimal") && !lower.contains("gap"),header)
     }
@@ -121,7 +121,7 @@ public enum PartitionSolver {
                              progress: @escaping @Sendable (Double,String) async -> Void = {_,_ in}) async throws -> (TileData,SolveResult) {
         try settings.validate();try image.validate();try Task.checkCancellation()
         let started=Date(),data=TileData(settings:settings)
-        await progress(0,"Computing CIE2000 tile errors…")
+        await progress(0,L("Computing CIE2000 tile errors…"))
         let costs=try CostEngine.compute(image:image,tiles:data)
         let s=settings.partitionSize,cols=(image.width+s-1)/s,rows=(image.height+s-1)/s
         var solution=Array(repeating:Array(repeating:0,count:image.width),count:image.height),reports=[PartitionReport]()
@@ -132,7 +132,7 @@ public enum PartitionSolver {
         for (index,coordinate) in order.enumerated() {
             try Task.checkCancellation()
             let (r,c)=coordinate,x=c*s,y=r*s,w=min(s,image.width-x),h=min(s,image.height-y)
-            await progress(Double(index)/Double(order.count),"Solving part \(index+1) of \(order.count) · \(w) × \(h) tiles")
+            await progress(Double(index)/Double(order.count),L("Solving part %@ of %@ · %@ × %@ tiles", String(describing: index+1), String(describing: order.count), String(describing: w), String(describing: h)))
             let left: [Int]? = c>0 ? (0..<h).map{solution[y+$0][x-1]} : nil
             let top: [Int]? = r>0 ? (0..<w).map{solution[y-1][x+$0]} : nil
             let problem=try makeProblem(block:Block(x:x,y:y,width:w,height:h),image:image,data:data,costs:costs,left:left,top:top)
@@ -146,6 +146,6 @@ public enum PartitionSolver {
             reports.append(PartitionReport(row:r,column:c,width:w,height:h,objective:objective,provenOptimal:parsed.optimal,solverStatus:parsed.status,elapsedSeconds:Date().timeIntervalSince(blockStart)))
         }
         let result=SolveResult(solution:solution,reports:reports,costBackend:costs.backend,elapsedSeconds:Date().timeIntervalSince(started))
-        try result.validate(tileData:data);await progress(1,"Rendering result…");return (data,result)
+        try result.validate(tileData:data);await progress(1,L("Rendering result…"));return (data,result)
     }
 }

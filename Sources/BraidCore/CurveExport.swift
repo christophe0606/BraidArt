@@ -6,22 +6,22 @@ public enum CurveExporter {
     /// Reports progress on the calling thread. Cancellation leaves the destination untouched.
     public static func writePDF(_ braid: BraidCurves, to url: URL, pointsPerTile: Double = 24,
                                 progress: (Double, String) -> Void = { _,_ in }) throws {
-        guard pointsPerTile.isFinite,(1...1000).contains(pointsPerTile) else { throw BraidError.invalid("Invalid PDF scale.") }
+        guard pointsPerTile.isFinite,(1...1000).contains(pointsPerTile) else { throw BraidError.invalid(L("Invalid PDF scale.")) }
         try Task.checkCancellation()
-        progress(0,"Preparing vector PDF…")
+        progress(0,L("Preparing vector PDF…"))
         let segmentCount=max(1,braid.curves.reduce(0) { $0+$1.segments.count })
         var completedSegments=0.0,lastReport=ProcessInfo.processInfo.systemUptime
         func reportDrawingProgress() throws {
             try Task.checkCancellation()
             let now=ProcessInfo.processInfo.systemUptime
             if now-lastReport >= 0.1 {
-                progress(min(0.9,0.9*completedSegments/Double(segmentCount)),"Drawing strand contours…")
+                progress(min(0.9,0.9*completedSegments/Double(segmentCount)),L("Drawing strand contours…"))
                 lastReport=now
             }
         }
         var box=CGRect(x:0,y:0,width:Double(braid.columns)*pointsPerTile,height:Double(braid.rows)*pointsPerTile)
         let output=NSMutableData()
-        guard let consumer=CGDataConsumer(data:output),let ctx=CGContext(consumer:consumer,mediaBox:&box,nil) else { throw BraidError.invalid("Cannot create vector PDF.") }
+        guard let consumer=CGDataConsumer(data:output),let ctx=CGContext(consumer:consumer,mediaBox:&box,nil) else { throw BraidError.invalid(L("Cannot create vector PDF.")) }
         // Also close the context on cancellation, while keeping partial bytes in memory.
         var closed=false
         defer { if !closed { ctx.endPDFPage();ctx.closePDF() } }
@@ -76,13 +76,13 @@ public enum CurveExporter {
             }
         }
         try Task.checkCancellation()
-        progress(0.9,"Finishing vector PDF…")
+        progress(0.9,L("Finishing vector PDF…"))
         ctx.endPDFPage();ctx.closePDF()
         closed=true
         try Task.checkCancellation()
-        progress(0.97,"Saving PDF…")
+        progress(0.97,L("Saving PDF…"))
         try Task.checkCancellation()
         try (output as Data).write(to:url,options:.atomic)
-        progress(1,"PDF saved.")
+        progress(1,L("PDF saved."))
     }
 }

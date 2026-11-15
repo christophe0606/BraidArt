@@ -45,7 +45,7 @@ public struct SceneSettings: Codable, Equatable, Sendable {
     public var planeDistance: Double = 0.15
     public init(planeColor: RGB = .gray, planeDistance: Double = 0.15) { self.planeColor=planeColor; self.planeDistance=planeDistance }
     public func validate() throws {
-        guard planeColor.valid, planeDistance.isFinite, (0...10).contains(planeDistance) else { throw BraidError.invalid("Invalid backing plane color or distance.") }
+        guard planeColor.valid, planeDistance.isFinite, (0...10).contains(planeDistance) else { throw BraidError.invalid(L("Invalid backing plane color or distance.")) }
     }
 }
 
@@ -57,7 +57,7 @@ public enum CurveGenerator {
         try SolveResult(solution:solution,reports:[],costBackend:"",elapsedSeconds:0).validate(tileData:data)
         guard data.palette.allSatisfy(\.valid), (0.1...0.6).contains(data.strandWidth),
               data.allTiles.allSatisfy({data.palette.indices.contains($0.firstColor) && data.palette.indices.contains($0.secondColor)})
-        else { throw BraidError.invalid("Invalid curve palette or width.") }
+        else { throw BraidError.invalid(L("Invalid curve palette or width.")) }
         let width=solution[0].count,height=solution.count
         var pieces=[Piece](), ends=[Key:[Int]]()
         for y in solution.indices { for x in 0..<width {
@@ -107,7 +107,7 @@ public enum CurveGenerator {
             let color=pieces[id].color
             while !used[current] {
                 let p=pieces[current]
-                guard p.color==color else { throw BraidError.invalid("Curve changes color at a tile edge.") }
+                guard p.color==color else { throw BraidError.invalid(L("Curve changes color at a tile edge.")) }
                 used[current]=true
                 if p.a==at { segments += p.segments;at=p.b }
                 else { segments += p.segments.reversed().map(\.reversed);at=p.a }

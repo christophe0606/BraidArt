@@ -16,12 +16,12 @@ struct PictureExportOptionsView: View {
     @ObservedObject var options:PictureExportOptions
     var body:some View {
         VStack(alignment:.leading,spacing:10) {
-            Picker("Output size",selection:$options.size) {
+            Picker(L("Output size"),selection:$options.size) {
                 ForEach(PictureExportSize.allCases) { size in Text(size.title).tag(size) }
             }
-            Text("\(Int(options.pixelSize.width)) × \(Int(options.pixelSize.height)) pixels · PNG")
+            Text(L("%@ × %@ pixels · PNG", String(describing: Int(options.pixelSize.width)), String(describing: Int(options.pixelSize.height))))
                 .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-            Text("Exports the area inside the red frame in the 3D view, keeping your current rotation and pan. Changing the output size updates the frame. Rendering starts after Save.")
+            Text(L("Exports the area inside the red frame in the 3D view, keeping your current rotation and pan. Changing the output size updates the frame. Rendering starts after Save."))
                 .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal:false,vertical:true)
         }.padding(12).frame(width:460)
     }

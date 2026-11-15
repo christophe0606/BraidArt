@@ -16,7 +16,7 @@ public struct CameraState: Codable, Equatable, Sendable {
     public func validate() throws {
         guard [target.x,target.y,target.z,Double(orbitYaw),Double(orbitPitch),Double(cameraDistance),Double(fitDistance),fieldOfView].allSatisfy(\.isFinite),
               (-1.45...1.45).contains(orbitPitch),cameraDistance>=0.5,fitDistance>0,(1...179).contains(fieldOfView) else {
-            throw BraidError.invalid("Invalid saved 3D camera.")
+            throw BraidError.invalid(L("Invalid saved 3D camera."))
         }
     }
 }

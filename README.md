@@ -21,6 +21,14 @@ then **Export**. **Help → BraidArt Help** introduces the app with a photograph
 astronaut Eileen Collins: the original photograph, a cropped portrait, its woven
 picture and its 3D artwork. The NASA photograph is public domain, as documented
 by [scikit-image](https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut).
+The interface, help, progress messages and app errors use standard macOS
+localization: French for French language preferences, and English as the
+development language and fallback. macOS also supports a per-app language choice
+in System Settings. Translations are in
+`Sources/BraidCore/Resources/{en,fr}.lproj/Localizable.strings`; Finder document
+names use `Resources/{en,fr}.lproj/InfoPlist.strings`. Original third-party
+license documents and project/export data retain their original text.
+
 The About window links to the [original photograph](https://flic.kr/p/r9qvLn)
 and NASA’s media usage guidelines.
 

@@ -16,7 +16,7 @@ public enum TubeMesher {
         let tiles=braid.columns*braid.rows
         let radialSegments=requestedRadial==0 ? (tiles>16384 ? 8 : tiles>4096 ? 10 : 16) : requestedRadial
         let curveSteps=requestedSteps==0 ? (tiles>16384 ? 4 : tiles>4096 ? 8 : 16) : requestedSteps
-        guard (6...32).contains(radialSegments),(4...64).contains(curveSteps) else { throw BraidError.invalid("Invalid mesh quality.") }
+        guard (6...32).contains(radialSegments),(4...64).contains(curveSteps) else { throw BraidError.invalid(L("Invalid mesh quality.")) }
         var meshes=braid.palette.enumerated().map{TubeMesh(color:$0.element,name:"Strand \($0.offset+1)")}
         for curve in braid.curves {
             var pts=[SIMD3<Double>]()

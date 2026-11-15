@@ -43,9 +43,9 @@ public enum TileRenderer {
     public static func render(solution: [[Int]], data: TileData, tileSize: Int = 40) throws -> CGImage {
         guard let columns=solution.first?.count, columns>0, !solution.isEmpty,
               solution.allSatisfy({$0.count==columns}), (4...128).contains(tileSize),
-              solution.joined().allSatisfy({ (1...data.allTiles.count).contains($0) }) else { throw BraidError.invalid("Invalid render dimensions or tile IDs.") }
+              solution.joined().allSatisfy({ (1...data.allTiles.count).contains($0) }) else { throw BraidError.invalid(L("Invalid render dimensions or tile IDs.")) }
         let width=columns*tileSize,height=solution.count*tileSize
-        guard width*height<=80_000_000 else { throw BraidError.invalid("Export exceeds 80 megapixels. Choose a smaller tile size.") }
+        guard width*height<=80_000_000 else { throw BraidError.invalid(L("Export exceeds 80 megapixels. Choose a smaller tile size.")) }
         let atlas=data.allTiles.map{raster(tile:$0,data:data,size:tileSize)}
         var bytes=[UInt8](repeating:255,count:width*height*4)
         bytes.withUnsafeMutableBytes { dst in
@@ -62,7 +62,7 @@ public enum TileRenderer {
     }
     private static func makeImage(bytes: [UInt8], width: Int, height: Int) throws -> CGImage {
         guard let provider=CGDataProvider(data:Data(bytes) as CFData),let space=CGColorSpace(name:CGColorSpace.sRGB),
-              let image=CGImage(width:width,height:height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:width*4,space:space,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.last.rawValue),provider:provider,decode:nil,shouldInterpolate:true,intent:.defaultIntent) else { throw BraidError.invalid("Cannot render tiles.") }
+              let image=CGImage(width:width,height:height,bitsPerComponent:8,bitsPerPixel:32,bytesPerRow:width*4,space:space,bitmapInfo:CGBitmapInfo(rawValue:CGImageAlphaInfo.last.rawValue),provider:provider,decode:nil,shouldInterpolate:true,intent:.defaultIntent) else { throw BraidError.invalid(L("Cannot render tiles.")) }
         return image
     }
 }

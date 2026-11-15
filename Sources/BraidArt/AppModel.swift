@@ -28,6 +28,7 @@ struct TilePreview: Identifiable {
 enum PaletteSeparation: String, CaseIterable, Identifiable {
     case keepShades="Keep shades", low="Low", medium="Medium", high="High"
     var id: Self { self }
+    var title: String { L(rawValue) }
     // Practical presets, rather than universal boundaries between color names.
     var minimumDistance: Double {
         switch self {
@@ -65,7 +66,7 @@ final class AppModel: ObservableObject {
     var busy: Bool { activity != nil }
     // Routine previews and extraction must not dim every control in the editor.
     var blocksEditing: Bool { activity == .exclusive }
-    @Published var status="Choose a picture to begin."
+    @Published var status=L("Choose a picture to begin.")
     @Published var progress=0.0
     @Published var error: String?
     let solverURL=CBCRunner.discover()
@@ -94,7 +95,7 @@ final class AppModel: ObservableObject {
     private var cachedTileData: TileData?
     private var paletteIDs=BraidCore.Settings().palette.map { _ in UUID() }
     private var exportSavePanel: NSSavePanel?
-    var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? "CPU fallback" }
+    var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? L("CPU fallback") }
     var tileData: TileData { TileData(settings:settings) }
     var preparedIsCurrent: Bool { prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true }
     var resultNeedsWeaving: Bool {
@@ -137,7 +138,7 @@ final class AppModel: ObservableObject {
         guard !busy else { return }
         task?.cancel();previewTask?.cancel();revision+=1
         if url.pathExtension.lowercased()=="braidart" || url.pathExtension.lowercased()=="json" { loadProject(url);return }
-        activity = .exclusive;status="Opening image…";let rev=revision
+        activity = .exclusive;status=L("Opening image…");let rev=revision
         task=Task {
             do {
                 let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.value
@@ -189,7 +190,7 @@ final class AppModel: ObservableObject {
     func prepare() {
         guard let url=sourceURL,!busy else { return }
         let snapshot=settings
-        activity = .preparingImage;status="Preparing image…"
+        activity = .preparingImage;status=L("Preparing image…")
         task=Task {
             do {
                 let image=try await Task.detached { try ImageProcessor.prepare(url:url,settings:snapshot) }.value
@@ -197,13 +198,13 @@ final class AppModel: ObservableObject {
                 // Discard an obsolete preview before publishing any pixels.
                 guard snapshot.hasSameImagePreparation(as:settings) else { activity=nil;prepare();return }
                 prepared=image;preparedSettings=snapshot;preparedImage=try ImageProcessor.cgImage(image).nsImage
-                status="\(image.width) × \(image.height) tiles · \(tileData.allTiles.count) candidates per tile";activity=nil
+                status=L("%@ × %@ tiles · %@ candidates per tile", String(describing: image.width), String(describing: image.height), String(describing: tileData.allTiles.count));activity=nil
             } catch { fail(error) }
         }
     }
     func extractPalette() {
         guard let image=prepared,!busy else { return }
-        activity = .extractingPalette;status="Finding strand and background colors…";let count=paletteCount,separation=paletteSeparation.minimumDistance
+        activity = .extractingPalette;status=L("Finding strand and background colors…");let count=paletteCount,separation=paletteSeparation.minimumDistance
         let includeAccents=paletteIncludeAccents,url=sourceURL,snapshot=settings,current=preparedIsCurrent
         task=Task {
             do {
@@ -226,17 +227,17 @@ final class AppModel: ObservableObject {
                 }.valueWithCancellation()
                 try Task.checkCancellation()
                 replacePalette(extracted.palette);settings.background=extracted.background
-                activity=nil;status="Extracted \(extracted.palette.count) of up to \(count) strand colors and fitted the background. Edit the colors below."
+                activity=nil;status=L("Extracted %@ of up to %@ strand colors and fitted the background. Edit the colors below.", String(describing: extracted.palette.count), String(describing: count))
                 settingsChanged()
             } catch is CancellationError {
-                activity=nil;status="Color extraction cancelled. Previous colors retained."
+                activity=nil;status=L("Color extraction cancelled. Previous colors retained.")
             } catch { fail(error) }
         }
     }
     func solve() {
         guard !busy,let image=prepared,let executable=solverURL else { return }
         let snapshot=settings,name=sourceName
-        activity = .exclusive;progress=0;selectedTab=2;status="Starting solver…"
+        activity = .exclusive;progress=0;selectedTab=2;status=L("Starting solver…")
         previewTask?.cancel()
         task=Task {
             do {
@@ -255,23 +256,23 @@ final class AppModel: ObservableObject {
                 project=BraidProject(sourceName:name,settings:snapshot,sampledImage:image,tileData:data,result:result)
                 project?.sceneSettings=sceneSettings
                 resultImage=rendered.nsImage;zoom=1;activity=nil;progress=1
-                let quality=result.allPartitionsOptimal ? "Every part proven optimal" : "Feasible result · some parts reached the time or gap limit"
-                status="\(quality) · \(String(format:"%.1f",result.elapsedSeconds)) s"
-            } catch is CancellationError { activity=nil;status="Cancelled. Previous result retained." }
+                let quality=result.allPartitionsOptimal ? L("Every part proven optimal") : L("Feasible result · some parts reached the time or gap limit")
+                status=L("%@ · %@ s", String(describing: quality), String(describing: String(format:"%.1f",result.elapsedSeconds)))
+            } catch is CancellationError { activity=nil;status=L("Cancelled. Previous result retained.") }
             catch { fail(error) }
         }
     }
     private func update(_ p: Double,_ message: String) { progress=p;status=message }
     func cancel() {
-        if let exportProgress { exportProgress.cancelling=true;exportProgress.message="Cancelling export…" }
+        if let exportProgress { exportProgress.cancelling=true;exportProgress.message=L("Cancelling export…") }
         task?.cancel();previewTask?.cancel()
     }
-    private func fail(_ err: Error) { activity=nil;error=err.localizedDescription;status="Could not complete the operation." }
+    private func fail(_ err: Error) { activity=nil;error=err.localizedDescription;status=L("Could not complete the operation.") }
     func saveProject() {
         guard let project=projectForSaving,!busy else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName).braidart";panel.allowedContentTypes=[.braidArtProject];panel.isExtensionHidden=false
         if panel.runModal() == .OK,let url=panel.url {
-            do { try project.save(to:url);status="Saved \(url.lastPathComponent)" } catch { fail(error) }
+            do { try project.save(to:url);status=L("Saved %@", String(describing: url.lastPathComponent)) } catch { fail(error) }
         }
     }
     var projectForSaving:BraidProject? {
@@ -283,7 +284,7 @@ final class AppModel: ObservableObject {
         return saved
     }
     private func loadProject(_ url: URL) {
-        activity = .exclusive;status="Opening project…"
+        activity = .exclusive;status=L("Opening project…")
         task=Task {
             do {
                 let loaded=try await Task.detached { try BraidProject.load(from:url) }.value
@@ -298,7 +299,7 @@ final class AppModel: ObservableObject {
                 hasCropSelection=loaded.settings.crop != Crop()
                 prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).nsImage
                 project=loaded;resultImage=rendered.nsImage;refreshTiles();selectedTab=loaded.cameraState == nil ? 2 : 3;activity=nil
-                status="Project restored · \(loaded.sampledImage.width) × \(loaded.sampledImage.height) tiles"
+                status=L("Project restored · %@ × %@ tiles", String(describing: loaded.sampledImage.width), String(describing: loaded.sampledImage.height))
             } catch { fail(error) }
         }
     }
@@ -306,26 +307,26 @@ final class AppModel: ObservableObject {
         guard let project=project,!busy else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.png";panel.allowedContentTypes=[.png]
         guard panel.runModal() == .OK,let url=panel.url else { return }
-        let size=exportTileSize;activity = .exclusive;status="Exporting PNG…"
+        let size=exportTileSize;activity = .exclusive;status=L("Exporting PNG…")
         task=Task {
             do {
                 try await Task.detached { let cg=try TileRenderer.render(solution:project.result.solution,data:project.tileData,tileSize:size);try ImageProcessor.writePNG(cg,to:url) }.value
-                activity=nil;status="Saved \(url.lastPathComponent)"
+                activity=nil;status=L("Saved %@", String(describing: url.lastPathComponent))
             } catch { fail(error) }
         }
     }
     func exportData() {
         guard let project=projectForSaving,!busy else { return }
         let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true
-        panel.message="Choose a parent folder for the solution, tile data and Wolfram export."
+        panel.message=L("Choose a parent folder for the solution, tile data and Wolfram export.")
         guard panel.runModal() == .OK,let parent=panel.url else { return }
         var folder=parent.appendingPathComponent("\(baseName)-braid-data",isDirectory:true);var n=2
         while FileManager.default.fileExists(atPath:folder.path) { folder=parent.appendingPathComponent("\(baseName)-braid-data-\(n)",isDirectory:true);n+=1 }
-        let destination=folder,size=exportTileSize;activity = .exclusive;status="Exporting solution and tiles…"
+        let destination=folder,size=exportTileSize;activity = .exclusive;status=L("Exporting solution and tiles…")
         task=Task {
             do {
                 try await Task.detached { try ProjectExporter.export(project,to:destination,tileSize:size) }.value
-                activity=nil;status="Exported \(destination.lastPathComponent)";NSWorkspace.shared.activateFileViewerSelecting([destination])
+                activity=nil;status=L("Exported %@", String(describing: destination.lastPathComponent));NSWorkspace.shared.activateFileViewerSelecting([destination])
             } catch { fail(error) }
         }
     }
@@ -342,7 +343,7 @@ final class AppModel: ObservableObject {
             self?.pictureExportSize=size
         }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]
-        panel.message="Export the current 3D picture."
+        panel.message=L("Export the current 3D picture.")
         let accessory=NSHostingView(rootView:PictureExportOptionsView(options:options))
         accessory.setFrameSize(accessory.fittingSize);panel.accessoryView=accessory
         exportSavePanel=panel
@@ -355,8 +356,8 @@ final class AppModel: ObservableObject {
         }
     }
     private func startPictureExport(_ capture:BraidPictureCapture,size:CGSize,to url:URL) {
-        let export=ExportProgress(title:"Exporting 3D Picture",filename:url.lastPathComponent,message:"Rendering 3D picture…")
-        activity = .exclusive;progress=0;status="Exporting 3D picture…";exportProgress=export
+        let export=ExportProgress(title:L("Exporting 3D Picture"),filename:url.lastPathComponent,message:L("Rendering 3D picture…"))
+        activity = .exclusive;progress=0;status=L("Exporting 3D picture…");exportProgress=export
         task=Task {
             do {
                 try await Task.detached(priority:.userInitiated) {
@@ -364,7 +365,7 @@ final class AppModel: ObservableObject {
                     try Task.checkCancellation()
                     DispatchQueue.main.async {
                         guard !export.cancelling else { return }
-                        export.progress=0.8;export.message="Saving PNG…"
+                        export.progress=0.8;export.message=L("Saving PNG…")
                     }
                     // Encode beside the destination, then commit only the complete image.
                     let temporary=url.deletingLastPathComponent().appendingPathComponent(".braidart-\(UUID().uuidString).png")
@@ -373,9 +374,9 @@ final class AppModel: ObservableObject {
                     try Task.checkCancellation()
                     try Data(contentsOf:temporary).write(to:url,options:.atomic)
                 }.valueWithCancellation()
-                exportProgress=nil;activity=nil;progress=1;status="Saved \(url.lastPathComponent)"
+                exportProgress=nil;activity=nil;progress=1;status=L("Saved %@", String(describing: url.lastPathComponent))
             } catch is CancellationError {
-                exportProgress=nil;activity=nil;progress=0;status="Picture export cancelled."
+                exportProgress=nil;activity=nil;progress=0;status=L("Picture export cancelled.")
             } catch {
                 exportProgress=nil;fail(error)
             }
@@ -395,8 +396,8 @@ final class AppModel: ObservableObject {
         else { panel.begin(completionHandler:completion) }
     }
     private func startPDFExport(_ curves:BraidCurves,to url:URL) {
-        let export=ExportProgress(title:"Exporting PDF",filename:url.lastPathComponent,message:"Preparing vector PDF…")
-        activity = .exclusive;progress=0;status="Exporting vector PDF…";exportProgress=export
+        let export=ExportProgress(title:L("Exporting PDF"),filename:url.lastPathComponent,message:L("Preparing vector PDF…"))
+        activity = .exclusive;progress=0;status=L("Exporting vector PDF…");exportProgress=export
         task=Task {
             do {
                 try await Task.detached(priority:.userInitiated) {
@@ -407,9 +408,9 @@ final class AppModel: ObservableObject {
                         }
                     }
                 }.valueWithCancellation()
-                exportProgress=nil;activity=nil;progress=1;status="Saved \(url.lastPathComponent)"
+                exportProgress=nil;activity=nil;progress=1;status=L("Saved %@", String(describing: url.lastPathComponent))
             } catch is CancellationError {
-                exportProgress=nil;activity=nil;progress=0;status="PDF export cancelled."
+                exportProgress=nil;activity=nil;progress=0;status=L("PDF export cancelled.")
             } catch {
                 exportProgress=nil;fail(error)
             }
@@ -420,14 +421,14 @@ final class AppModel: ObservableObject {
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.glb";panel.allowedContentTypes=[UTType(filenameExtension:"glb") ?? .data]
         guard panel.runModal() == .OK,let url=panel.url else { return }
         let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
-        runExport("Exporting colored 3D object…",success:"Saved \(url.lastPathComponent)") { try GLBExporter.write(meshes:all,to:url) }
+        runExport(L("Exporting colored 3D object…"),success:L("Saved %@", String(describing: url.lastPathComponent))) { try GLBExporter.write(meshes:all,to:url) }
     }
     func exportUSDZ() {
         guard let curves,!busy,exportSavePanel == nil else { return }
         let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.usdz"
         panel.allowedContentTypes=[UTType(filenameExtension:"usdz") ?? .data]
-        panel.message="Export a colored 3D object for Apple Motion."
+        panel.message=L("Export a colored 3D object for Apple Motion.")
         exportSavePanel=panel
         let completion:(NSApplication.ModalResponse)->Void = { [weak self] response in
             guard let self else { return }
@@ -439,8 +440,8 @@ final class AppModel: ObservableObject {
         else { panel.begin(completionHandler:completion) }
     }
     private func startUSDZExport(_ meshes:[TubeMesh],to url:URL) {
-        let export=ExportProgress(title:"Exporting USDZ",filename:url.lastPathComponent,message:"Preparing USDZ geometry…")
-        activity = .exclusive;progress=0;status="Exporting USDZ 3D object…";exportProgress=export
+        let export=ExportProgress(title:L("Exporting USDZ"),filename:url.lastPathComponent,message:L("Preparing USDZ geometry…"))
+        activity = .exclusive;progress=0;status=L("Exporting USDZ 3D object…");exportProgress=export
         task=Task {
             do {
                 try await Task.detached(priority:.userInitiated) {
@@ -451,9 +452,9 @@ final class AppModel: ObservableObject {
                         }
                     }
                 }.valueWithCancellation()
-                exportProgress=nil;activity=nil;progress=1;status="Saved \(url.lastPathComponent)"
+                exportProgress=nil;activity=nil;progress=1;status=L("Saved %@", String(describing: url.lastPathComponent))
             } catch is CancellationError {
-                exportProgress=nil;activity=nil;progress=0;status="USDZ export cancelled."
+                exportProgress=nil;activity=nil;progress=0;status=L("USDZ export cancelled.")
             } catch {
                 exportProgress=nil;fail(error)
             }

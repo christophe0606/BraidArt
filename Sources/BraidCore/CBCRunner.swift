@@ -12,7 +12,7 @@ public enum CBCRunner {
         return candidates.first{fm.isExecutableFile(atPath:$0.path)}
     }
     public static func solve(problem: BlockProblem, executable: URL, settings: Settings) async throws -> String {
-        guard FileManager.default.isExecutableFile(atPath:executable.path) else { throw BraidError.invalid("Select a CBC executable or build the bundled solver with Scripts/build-solver.sh.") }
+        guard FileManager.default.isExecutableFile(atPath:executable.path) else { throw BraidError.invalid(L("Select a CBC executable or build the bundled solver with Scripts/build-solver.sh.")) }
         let temp=FileManager.default.temporaryDirectory.appendingPathComponent("BraidArt-\(UUID().uuidString)",isDirectory:true)
         try FileManager.default.createDirectory(at:temp,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:temp) }
@@ -30,7 +30,7 @@ public enum CBCRunner {
             let deadline=Date().addingTimeInterval(settings.secondsPerPartition+20)
             while process.isRunning {
                 try Task.checkCancellation()
-                if Date()>deadline { throw BraidError.invalid("CBC exceeded its time limit. Reduce the partition size.") }
+                if Date()>deadline { throw BraidError.invalid(L("CBC exceeded its time limit. Reduce the partition size.")) }
                 try await Task.sleep(nanoseconds:50_000_000)
             }
         } catch {
@@ -41,8 +41,8 @@ public enum CBCRunner {
             throw error
         }
         guard process.terminationStatus==0,FileManager.default.fileExists(atPath:output.path) else {
-            let detail=(try? String(contentsOf:log,encoding:.utf8)) ?? "No diagnostic output."
-            throw BraidError.invalid("CBC could not solve this partition.\n\(detail.suffix(2500))")
+            let detail=(try? String(contentsOf:log,encoding:.utf8)) ?? L("No diagnostic output.")
+            throw BraidError.invalid(L("CBC could not solve this partition.\n%@", String(describing: detail.suffix(2500))))
         }
         return try String(contentsOf:output,encoding:.utf8)
     }

@@ -10,14 +10,14 @@ struct ContentView: View {
             SettingsSidebar(model:model,state:SidebarState(model:model)).equatable()
             VStack(spacing:0) {
                 HStack {
-                    Picker("Workspace",selection:$model.selectedTab) {
-                        Text("Prepare").tag(0);Text("Tile Library").tag(1);Text("Result").tag(2);Text("3D").tag(3)
+                    Picker(L("Workspace"),selection:$model.selectedTab) {
+                        Text(L("Prepare")).tag(0);Text(L("Tile Library")).tag(1);Text(L("Result")).tag(2);Text(L("3D")).tag(3)
                     }.pickerStyle(.segmented).frame(width:380)
                     Spacer()
                     if model.blocksEditing {
-                        Button("Cancel",role:.cancel,action:model.cancel)
+                        Button(L("Cancel"),role:.cancel,action:model.cancel)
                     } else {
-                        Button(action:model.solve) { Label("Weave Image",systemImage:"play.fill") }.buttonStyle(.borderedProminent).tint(.orange)
+                        Button(action:model.solve) { Label(L("Weave Image"),systemImage:"play.fill") }.buttonStyle(.borderedProminent).tint(.orange)
                             .disabled(model.busy || model.prepared==nil || model.solverURL==nil || !model.preparedIsCurrent || (try? model.settings.validate()) == nil)
                             .keyboardShortcut(.return,modifiers:.command)
                     }
@@ -37,7 +37,7 @@ struct ContentView: View {
                         Circle().fill(model.busy ? Color.orange : Color.secondary.opacity(0.6)).frame(width:6,height:6)
                         Text(model.status).font(.caption).lineLimit(2)
                         Spacer(minLength:12)
-                        Label("Metal",systemImage:"bolt.fill").font(.caption2).foregroundStyle(.secondary).help(model.gpuName)
+                        Label(L("Metal"),systemImage:"bolt.fill").font(.caption2).foregroundStyle(.secondary).help(model.gpuName)
                     }
                 }.padding(14).background(.bar)
             }.frame(minWidth:700)
@@ -61,41 +61,41 @@ struct ContentView: View {
         .onChange(of:model.sceneSettings) { _,_ in model.sceneSettingsChanged() }
         .onChange(of:model.settings) { _,_ in model.settingsChanged() }
         .sheet(item:$model.exportProgress) { export in ExportProgressView(export:export,cancel:model.cancel) }
-        .alert("BraidArt",isPresented:Binding(get:{model.error != nil},set:{if !$0 {model.error=nil}})) { Button("OK") { model.error=nil } } message:{Text(model.error ?? "")}
+        .alert("BraidArt",isPresented:Binding(get:{model.error != nil},set:{if !$0 {model.error=nil}})) { Button(L("OK")) { model.error=nil } } message:{Text(model.error ?? "")}
     }
     private var prepareWorkspace: some View {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
-                title("A picture, reimagined as strands.",subtitle:"Crop the source, choose a tile resolution, then weave.")
+                title(L("A picture, reimagined as strands."),subtitle:L("Crop the source, choose a tile resolution, then weave."))
                 if let image=model.sourceImage {
-                    Text("SOURCE & CROP").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                    Text(L("SOURCE & CROP")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     HStack(spacing:12) {
-                        Picker("Aspect ratio",selection:Binding(get:{model.settings.cropAspectRatio},set:{model.setCropAspectRatio($0)})) {
-                            Text("Free").tag(PictureExportSize?.none)
+                        Picker(L("Aspect ratio"),selection:Binding(get:{model.settings.cropAspectRatio},set:{model.setCropAspectRatio($0)})) {
+                            Text(L("Free")).tag(PictureExportSize?.none)
                             ForEach(PictureExportSize.allCases.filter { $0 != .viewport }) { preset in
                                 Text(preset.title).tag(Optional(preset))
                             }
                         }.pickerStyle(.menu).frame(maxWidth:400)
                         Spacer(minLength:0)
                         Button { model.scaleCrop(by:1/1.1) } label: { Image(systemName:"minus.magnifyingglass") }
-                            .help("Scale crop down").accessibilityLabel("Scale crop down").disabled(!model.hasCropSelection)
+                            .help(L("Scale crop down")).accessibilityLabel(L("Scale crop down")).disabled(!model.hasCropSelection)
                         Button { model.scaleCrop(by:1.1) } label: { Image(systemName:"plus.magnifyingglass") }
-                            .help("Scale crop up").accessibilityLabel("Scale crop up").disabled(!model.hasCropSelection)
-                        Button("Delete Crop",action:model.clearCrop).disabled(!model.hasCropSelection)
+                            .help(L("Scale crop up")).accessibilityLabel(L("Scale crop up")).disabled(!model.hasCropSelection)
+                        Button(L("Delete Crop"),action:model.clearCrop).disabled(!model.hasCropSelection)
                     }.controlSize(.small).disabled(model.blocksEditing)
                     CropEditor(image:image,crop:$model.settings.crop,hasSelection:$model.hasCropSelection,aspectRatio:model.cropAspectRatio,onDelete:model.clearCrop)
                         .frame(height:350).disabled(model.blocksEditing)
-                    Text(model.hasCropSelection ? "Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Delete Crop to draw another rectangle." : "Drag on the picture to draw a crop rectangle.")
+                    Text(model.hasCropSelection ? L("Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Delete Crop to draw another rectangle.") : L("Drag on the picture to draw a crop rectangle."))
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(model.hasCropSelection ? "Crop: \(Int(model.settings.crop.width*100))% × \(Int(model.settings.crop.height*100))% of source" : "Using the full picture.")
+                    Text(model.hasCropSelection ? L("Crop: %@%% × %@%% of source", String(describing: Int(model.settings.crop.width*100)), String(describing: Int(model.settings.crop.height*100))) : L("Using the full picture."))
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                 } else if model.prepared == nil {
-                    emptyState(symbol:"photo.badge.plus",title:"Start with a picture",detail:"Drop a photograph or illustration here, or choose one. Each sample will become a connected braid tile.",button:"Open Image…",action:model.chooseImage).frame(height:360)
+                    emptyState(symbol:"photo.badge.plus",title:L("Start with a picture"),detail:L("Drop a photograph or illustration here, or choose one. Each sample will become a connected braid tile."),button:L("Open Image…"),action:model.chooseImage).frame(height:360)
                 }
                 if let image=model.preparedImage {
-                    HStack { Text("SAMPLED IMAGE").font(.caption.weight(.semibold)).foregroundStyle(.secondary);Spacer();if let p=model.prepared {Text("\(p.width) × \(p.height)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)} }
+                    HStack { Text(L("SAMPLED IMAGE")).font(.caption.weight(.semibold)).foregroundStyle(.secondary);Spacer();if let p=model.prepared {Text(L("%@ × %@", String(describing: p.width), String(describing: p.height))).font(.caption.monospacedDigit()).foregroundStyle(.secondary)} }
                     Image(nsImage:image).resizable().interpolation(.none).scaledToFit().frame(maxWidth:.infinity,maxHeight:300).padding(16).background(Color.black.opacity(0.15),in:RoundedRectangle(cornerRadius:12))
-                    Text("One sample becomes one tile. The optimizer matches each tile’s average color to this image.").font(.caption).foregroundStyle(.secondary)
+                    Text(L("One sample becomes one tile. The optimizer matches each tile’s average color to this image.")).font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(28)
         }
@@ -103,12 +103,12 @@ struct ContentView: View {
     private var tileLibrary: some View {
         ScrollView {
             VStack(alignment:.leading,spacing:22) {
-                title("The building blocks.",subtitle:"All color pairs, four geometries. IDs match the notebook’s tile order.")
+                title(L("The building blocks."),subtitle:L("All color pairs, four geometries. IDs match the notebook’s tile order."))
                 LazyVGrid(columns:[GridItem(.adaptive(minimum:100),spacing:14)],spacing:20) {
                     ForEach(model.tilePreviews) { preview in
                         VStack(alignment:.leading,spacing:6) {
                             Image(nsImage:preview.image).resizable().interpolation(.high).aspectRatio(1,contentMode:.fit).clipShape(RoundedRectangle(cornerRadius:5))
-                            Text("\(preview.tile.id) · \(preview.tile.kind.rawValue)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                            Text(L("%@ · %@", String(describing: preview.tile.id), String(describing: preview.tile.kind.title))).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -120,16 +120,16 @@ struct ContentView: View {
             if let image=model.resultImage,let project=model.project {
                 HStack(spacing:20) {
                     VStack(alignment:.leading,spacing:4) {
-                        Text("The woven image").font(.title2.weight(.semibold))
-                        Text("\(project.sampledImage.width) × \(project.sampledImage.height) tiles · \(project.result.reports.count) parts · mean ΔE \(String(format:"%.2f",project.result.objective/Double(project.sampledImage.pixels.count)))").font(.caption).foregroundStyle(.secondary)
+                        Text(L("The woven image")).font(.title2.weight(.semibold))
+                        Text(L("%@ × %@ tiles · %@ parts · mean ΔE %@", String(describing: project.sampledImage.width), String(describing: project.sampledImage.height), String(describing: project.result.reports.count), String(describing: String(format:"%.2f",project.result.objective/Double(project.sampledImage.pixels.count))))).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text("Zoom").font(.caption)
+                    Text(L("Zoom")).font(.caption)
                     Slider(value:$model.zoom,in:0.25...4).frame(width:100)
-                    Button("Fit") { model.zoom=1 }.controlSize(.small)
+                    Button(L("Fit")) { model.zoom=1 }.controlSize(.small)
                 }.padding(22)
                 if model.resultNeedsWeaving {
-                    Label("Showing the previous result. Weave again to apply the current settings.",systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,22).padding(.bottom,12)
+                    Label(L("Showing the previous result. Weave again to apply the current settings."),systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,22).padding(.bottom,12)
                 }
                 GeometryReader { proxy in
                     let fit=min((proxy.size.width-40)/image.size.width,(proxy.size.height-40)/image.size.height)
@@ -139,12 +139,12 @@ struct ContentView: View {
                     }
                 }.background(Color.black.opacity(0.15))
                 HStack {
-                    Label(project.result.allPartitionsOptimal ? "Parts proven optimal" : "Feasible · time or gap limited",systemImage:project.result.allPartitionsOptimal ? "checkmark.seal" : "clock").font(.caption).foregroundStyle(.secondary)
+                    Label(project.result.allPartitionsOptimal ? L("Parts proven optimal") : L("Feasible · time or gap limited"),systemImage:project.result.allPartitionsOptimal ? "checkmark.seal" : "clock").font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Text(project.result.costBackend).font(.caption2).foregroundStyle(.secondary)
                 }.padding(16)
             } else {
-                emptyState(symbol:"square.grid.3x3",title:model.busy ? "Weaving your image" : "Ready to weave",detail:model.busy ? "Each part is solved with strand continuity constraints. Progress appears below." : "Prepare a picture and choose your palette, then select Weave Image.",button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)
+                emptyState(symbol:"square.grid.3x3",title:model.busy ? L("Weaving your image") : L("Ready to weave"),detail:model.busy ? L("Each part is solved with strand continuity constraints. Progress appears below.") : L("Prepare a picture and choose your palette, then select Weave Image."),button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)
             }
         }
     }
@@ -153,29 +153,29 @@ struct ContentView: View {
             if let braid=model.curves {
                 HStack {
                     VStack(alignment:.leading,spacing:4) {
-                        Text("The woven sculpture").font(.title2.weight(.semibold))
-                        Text("\(braid.curves.count) curves · Metal · drag to rotate, Shift-drag or right-drag to pan, scroll or pinch to zoom").font(.caption).foregroundStyle(.secondary)
+                        Text(L("The woven sculpture")).font(.title2.weight(.semibold))
+                        Text(L("%@ curves · Metal · drag to rotate, Shift-drag or right-drag to pan, scroll or pinch to zoom", String(describing: braid.curves.count))).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button("Front / Fit") { model.resetCamera(oblique:false) }
-                    Button("Perspective") { model.resetCamera(oblique:true) }
+                    Button(L("Front / Fit")) { model.resetCamera(oblique:false) }
+                    Button(L("Perspective")) { model.resetCamera(oblique:true) }
                 }.padding(20)
                 HStack(spacing:20) {
-                    ColorPicker("Backing plane",selection:Binding(get:{model.sceneSettings.planeColor.color},set:{model.sceneSettings.planeColor=RGB(color:$0)}),supportsOpacity:false).frame(maxWidth:230)
-                    Text("Clearance").font(.caption)
+                    ColorPicker(L("Backing plane"),selection:Binding(get:{model.sceneSettings.planeColor.color},set:{model.sceneSettings.planeColor=RGB(color:$0)}),supportsOpacity:false).frame(maxWidth:230)
+                    Text(L("Clearance")).font(.caption)
                     Slider(value:$model.sceneSettings.planeDistance,in:0...3).frame(maxWidth:180)
-                    Text(String(format:"%.2f tiles",model.sceneSettings.planeDistance)).font(.caption.monospacedDigit()).frame(width:75)
+                    Text(String(format:L("%.2f tiles"),model.sceneSettings.planeDistance)).font(.caption.monospacedDigit()).frame(width:75)
                     Spacer()
                 }.padding(.horizontal,20).padding(.bottom,16)
                 HStack(spacing:16) {
-                    Picker("Picture dimensions",selection:$model.pictureExportSize) {
+                    Picker(L("Picture dimensions"),selection:$model.pictureExportSize) {
                         ForEach(PictureExportSize.allCases) { size in Text(size.title).tag(size) }
                     }.pickerStyle(.menu).fixedSize()
-                    Text("The red frame marks the exported area.").font(.caption).foregroundStyle(.secondary)
+                    Text(L("The red frame marks the exported area.")).font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength:0)
                 }.padding(.horizontal,20).padding(.bottom,16)
                 if model.resultNeedsWeaving {
-                    Label("Showing the previous result. Weave again to apply the current settings.",systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).padding(.bottom,12)
+                    Label(L("Showing the previous result. Weave again to apply the current settings."),systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).padding(.bottom,12)
                 }
                 Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,camera:model.cameraState,onCameraChanged:model.cameraChanged,onViewReady:model.register3DView)
                     .overlay {
@@ -186,9 +186,9 @@ struct ContentView: View {
                                 .position(x:frame.midX,y:frame.midY)
                         }.allowsHitTesting(false).accessibilityHidden(true)
                     }
-                Text("Plane clearance is measured from the back of the lowest strand. Plane settings are saved with the project and 3D exports.").font(.caption).foregroundStyle(.secondary).padding(14)
+                Text(L("Plane clearance is measured from the back of the lowest strand. Plane settings are saved with the project and 3D exports.")).font(.caption).foregroundStyle(.secondary).padding(14)
             } else {
-                emptyState(symbol:"cube.transparent",title:"Curves become a sculpture",detail:"Weave an image or open a saved project to inspect its connected strands in 3D.",button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)
+                emptyState(symbol:"cube.transparent",title:L("Curves become a sculpture"),detail:L("Weave an image or open a saved project to inspect its connected strands in 3D."),button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)
             }
         }
     }

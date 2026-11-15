@@ -81,7 +81,7 @@ final class PaletteTests: XCTestCase {
         XCTAssertEqual(model.settings.palette,[color])
         XCTAssertNotEqual(model.settings.background,RGB(1,0,1))
         XCTAssertGreaterThanOrEqual(Lab(sRGB:model.settings.background).distance(to:Lab(sRGB:color)),BackgroundExtractor.minimumStrandDistance)
-        XCTAssertTrue(model.status.contains("fitted the background"))
+        XCTAssertEqual(model.status,L("Extracted %@ of up to %@ strand colors and fitted the background. Edit the colors below.","1",String(model.paletteCount)))
     }
 
     @MainActor func testExtractionImmediatelyAfterLuminanceToggleUsesCurrentAdjustments() async throws {
@@ -140,7 +140,7 @@ final class PaletteTests: XCTestCase {
             XCTAssertFalse(model.busy)
             let expected=separation == .keepShades || separation == .low ? 2 : 1
             XCTAssertEqual(model.settings.palette.count,expected)
-            XCTAssertTrue(model.status.contains("Extracted \(expected) of up to 4 strand colors"))
+            XCTAssertEqual(model.status,L("Extracted %@ of up to %@ strand colors and fitted the background. Edit the colors below.",String(expected),"4"))
         }
     }
 

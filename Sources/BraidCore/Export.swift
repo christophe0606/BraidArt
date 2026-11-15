@@ -4,7 +4,7 @@ public enum ProjectExporter {
     /// A self-contained folder, including Wolfram-readable data and a PNG for every tile.
     public static func export(_ project: BraidProject, to folder: URL, tileSize: Int = 50) throws {
         try project.validate()
-        guard !FileManager.default.fileExists(atPath:folder.path) else { throw BraidError.invalid("Export folder already exists. Choose a new name.") }
+        guard !FileManager.default.fileExists(atPath:folder.path) else { throw BraidError.invalid(L("Export folder already exists. Choose a new name.")) }
         try FileManager.default.createDirectory(at:folder.appendingPathComponent("tiles"),withIntermediateDirectories:true)
         var complete=false
         defer { if !complete { try? FileManager.default.removeItem(at:folder) } }

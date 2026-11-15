@@ -11,7 +11,7 @@ public enum CostEngine {
     public static func compute(image: PixelImage, tiles: TileData, useGPU: Bool = true) throws -> CostTable {
         try image.validate()
         let total=image.pixels.count*tiles.allTiles.count
-        guard total<=32_000_000 else { throw BraidError.invalid("Too many tile candidates. Reduce image size or palette size.") }
+        guard total<=32_000_000 else { throw BraidError.invalid(L("Too many tile candidates. Reduce image size or palette size.")) }
         let options=MTLCompileOptions();options.fastMathEnabled=false
         if useGPU, let device=MTLCreateSystemDefaultDevice(),
            let url=Bundle.module.url(forResource: "ColorCost",withExtension: "metal"),
