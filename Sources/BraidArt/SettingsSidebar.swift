@@ -74,13 +74,28 @@ struct SettingsSidebar: View, Equatable {
                     }
                     HStack {
                         Stepper("Up to \(state.paletteCount) colors",value:binding(\.paletteCount),in:2...8)
-                        Button("Extract",action:model.extractPalette).disabled(state.preparedSize==nil).help("Find representative colors in the prepared picture")
+                        Button("Extract",action:model.extractPalette).disabled(state.preparedSize==nil).help("Extract strand colors and fit the background to the prepared picture")
                     }
                     Picker("Color separation",selection:binding(\.paletteSeparation)) {
                         ForEach(PaletteSeparation.allCases) { separation in Text(separation.rawValue).tag(separation) }
                     }.help("Higher separation merges more similar shades. Select Extract to apply it.")
+                    VStack(alignment:.leading,spacing:4) {
+                        HStack {
+                            Text("Background contrast")
+                            Spacer()
+                            Text(String(format:"%.0f",state.settings.backgroundMinimumDistance)).monospacedDigit().foregroundStyle(.secondary)
+                        }.font(.caption)
+                        HStack(spacing:8) {
+                            Slider(value:binding(\.settings.backgroundMinimumDistance),in:1...50,step:1)
+                                .accessibilityLabel("Background contrast")
+                            Button("Reset") { model.settings.backgroundMinimumDistance=BraidCore.Settings.defaultBackgroundMinimumDistance }
+                                .controlSize(.small).accessibilityLabel("Reset background contrast")
+                        }
+                        Text("Higher values make strands stand out more. Select Extract to apply.").font(.caption).foregroundStyle(.secondary)
+                    }.help("Minimum perceptual distance (CIEDE2000) between the extracted background and every strand. Default: 15.")
                     Toggle("Include small accents",isOn:binding(\.paletteIncludeAccents)).help("Preserve distinct colors in small details using a more detailed sample of the crop. Turn off to favor the largest image regions.")
                     Text("Higher separation avoids similar shades and may return fewer colors. Use 6–8 colors to include more details. Select Extract to apply.").font(.caption).foregroundStyle(.secondary)
+                    Text("Extract keeps the background distinct from every strand so they remain visible. It may use fewer strand colors when needed. Luminance mode selects shades from black to white.").font(.caption).foregroundStyle(.secondary)
                     Text("\(state.settings.palette.count*state.settings.palette.count*4) dark tiles · four strand geometries").font(.caption).foregroundStyle(.secondary)
                     DisclosureGroup("Strand geometry") {
                         VStack(spacing:8) {

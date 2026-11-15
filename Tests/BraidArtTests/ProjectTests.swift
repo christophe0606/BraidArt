@@ -10,10 +10,14 @@ final class ProjectTests:XCTestCase {
         let image=PixelImage(width:8,height:2,pixels:Array(repeating:.gray,count:16))
         let result=SolveResult(solution:Array(repeating:Array(repeating:1,count:8),count:2),reports:[],costBackend:"Test",elapsedSeconds:0)
         model.project=BraidProject(sourceName:"Saved camera",settings:settings,sampledImage:image,tileData:data,result:result)
+        model.settings=settings
+        model.settings.backgroundMinimumDistance=27
+        XCTAssertFalse(model.resultNeedsWeaving)
         let camera=CameraState(target:CurvePoint(3,-2,0.5),orbitYaw:0.4,orbitPitch:-0.3,cameraDistance:12,fitDistance:15)
         model.cameraChanged(camera);model.pictureExportSize = .instagramPortrait
         model.sceneSettings=SceneSettings(planeColor:RGB(0.1,0.2,0.3),planeDistance:0.7)
         let saved=try XCTUnwrap(model.projectForSaving)
+        XCTAssertEqual(saved.settings.backgroundMinimumDistance,27)
         XCTAssertEqual(saved.cameraState,camera);XCTAssertEqual(saved.pictureExportSize,.instagramPortrait)
         XCTAssertEqual(saved.sceneSettings,model.sceneSettings)
         let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -27,6 +31,7 @@ final class ProjectTests:XCTestCase {
             XCTAssertFalse(model.busy);XCTAssertNil(model.error)
         }
         model.open(url:url);await waitForOpen()
+        XCTAssertEqual(model.settings.backgroundMinimumDistance,27)
         XCTAssertEqual(model.cameraState,camera);XCTAssertEqual(model.pictureExportSize,.instagramPortrait)
         XCTAssertEqual(model.selectedTab,3)
         XCTAssertEqual(model.projectForSaving?.cameraState,camera)

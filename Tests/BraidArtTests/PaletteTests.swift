@@ -4,6 +4,108 @@ import BraidCore
 @testable import BraidArt
 
 final class PaletteTests: XCTestCase {
+    @MainActor func testExtractUsesTheSelectedBackgroundThreshold() async throws {
+        let model=AppModel()
+        model.settings.grayscale=true;model.settings.backgroundMinimumDistance=30
+        model.prepared=PixelImage(width:4,height:1,pixels:Array(repeating:.black,count:4))
+        model.extractPalette()
+        let deadline=ContinuousClock.now.advanced(by:.seconds(5))
+        while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
+        XCTAssertFalse(model.busy);XCTAssertNil(model.error)
+        XCTAssertEqual(model.settings.palette,[.black])
+        XCTAssertGreaterThanOrEqual(Lab(sRGB:.black).distance(to:Lab(sRGB:model.settings.background)),30)
+        XCTAssertEqual(model.settings.backgroundMinimumDistance,30)
+    }
+
+    @MainActor func testLuminanceExtractionKeepsBlackAndWhiteStrandsVisible() async throws {
+        for tone in [RGB.black,.white] {
+            let model=AppModel()
+            model.settings.grayscale=true;model.settings.background=RGB(1,0,1)
+            model.prepared=PixelImage(width:4,height:1,pixels:Array(repeating:tone,count:4))
+            model.extractPalette()
+            let deadline=ContinuousClock.now.advanced(by:.seconds(5))
+            while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
+            XCTAssertFalse(model.busy);XCTAssertNil(model.error)
+            XCTAssertEqual(model.settings.palette,[tone])
+            XCTAssertGreaterThanOrEqual(Lab(sRGB:model.settings.background).distance(to:Lab(sRGB:tone)),BackgroundExtractor.minimumStrandDistance)
+            XCTAssertEqual(model.settings.background.r,model.settings.background.g)
+            XCTAssertEqual(model.settings.background.g,model.settings.background.b)
+        }
+        let model=AppModel()
+        model.settings.grayscale=true
+        model.prepared=PixelImage(width:5,height:1,pixels:[.black,RGB(0.2,0.2,0.2),.gray,RGB(0.8,0.8,0.8),.white])
+        model.extractPalette()
+        let deadline=ContinuousClock.now.advanced(by:.seconds(5))
+        while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
+        XCTAssertFalse(model.busy);XCTAssertNil(model.error)
+        XCTAssertTrue(model.settings.palette.contains(.black))
+        XCTAssertTrue(model.settings.palette.contains(.white))
+        XCTAssertTrue(model.settings.palette.allSatisfy { $0.valid && $0.r==$0.g && $0.g==$0.b })
+        for color in model.settings.palette {
+            XCTAssertGreaterThanOrEqual(Lab(sRGB:color).distance(to:Lab(sRGB:model.settings.background)),BackgroundExtractor.minimumStrandDistance)
+        }
+    }
+
+    @MainActor func testPhotographBackgroundFitImprovesTileMatchingWithVisibleStrands() async throws {
+        let url=try XCTUnwrap(HelpIllustration.photograph.url)
+        var settings=BraidCore.Settings()
+        let image=try ImageProcessor.prepare(url:url,settings:settings)
+        let detail=try ImageProcessor.preparePalette(url:url,settings:settings)
+        settings.palette=PaletteExtractor.distinctColors(in:detail,count:6)
+        func error(_ settings:BraidCore.Settings) throws -> Double {
+            let costs=try CostEngine.compute(image:image,tiles:TileData(settings:settings),useGPU:false)
+            return image.pixels.indices.reduce(0) { total,pixel in
+                total+(0..<costs.tileCount).map { costs[pixel,$0] }.min()!
+            }/Double(image.pixels.count)
+        }
+        let previous=try error(settings),palette=settings.palette
+        let match=try BackgroundExtractor.matching(image,settings:settings)
+        settings.background=match.background;settings.palette=match.palette
+        XCTAssertLessThan(try error(settings),previous)
+        XCTAssertEqual(settings.palette,palette)
+        for color in settings.palette {
+            XCTAssertGreaterThanOrEqual(Lab(sRGB:color).distance(to:Lab(sRGB:settings.background)),BackgroundExtractor.minimumStrandDistance)
+        }
+    }
+
+    @MainActor func testExtractionUpdatesBackgroundAlongWithTheStrands() async throws {
+        let model=AppModel()
+        let color=RGB(0.18,0.42,0.73)
+        model.prepared=PixelImage(width:4,height:1,pixels:Array(repeating:color,count:4))
+        model.settings.background=RGB(1,0,1)
+        model.extractPalette()
+        let deadline=ContinuousClock.now.advanced(by:.seconds(5))
+        while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
+        XCTAssertFalse(model.busy);XCTAssertNil(model.error)
+        XCTAssertEqual(model.settings.palette,[color])
+        XCTAssertNotEqual(model.settings.background,RGB(1,0,1))
+        XCTAssertGreaterThanOrEqual(Lab(sRGB:model.settings.background).distance(to:Lab(sRGB:color)),BackgroundExtractor.minimumStrandDistance)
+        XCTAssertTrue(model.status.contains("fitted the background"))
+    }
+
+    @MainActor func testExtractionImmediatelyAfterLuminanceToggleUsesCurrentAdjustments() async throws {
+        let model=AppModel()
+        let url=try XCTUnwrap(HelpIllustration.photograph.url)
+        model.open(url:url)
+        let openDeadline=ContinuousClock.now.advanced(by:.seconds(5))
+        while model.busy,ContinuousClock.now<openDeadline { try await Task.sleep(for:.milliseconds(10)) }
+        XCTAssertFalse(model.busy);XCTAssertNil(model.error)
+        model.settings.grayscale=true
+        model.settings.contrast=1.3
+        // Do not wait for the preview's debounce before selecting Extract.
+        model.extractPalette()
+        let deadline=ContinuousClock.now.advanced(by:.seconds(10))
+        while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
+        XCTAssertFalse(model.busy);XCTAssertNil(model.error)
+        for color in model.settings.palette+[model.settings.background] {
+            XCTAssertEqual(color.r,color.g,accuracy:1e-12);XCTAssertEqual(color.g,color.b,accuracy:1e-12)
+        }
+        for color in model.settings.palette {
+            XCTAssertGreaterThanOrEqual(Lab(sRGB:color).distance(to:Lab(sRGB:model.settings.background)),BackgroundExtractor.minimumStrandDistance)
+        }
+        XCTAssertFalse(model.blocksEditing)
+    }
+
     @MainActor func testAccentExtractionUsesSampledProjectWhenOriginalIsUnavailable() async throws {
         let model=AppModel()
         XCTAssertTrue(model.paletteIncludeAccents)
@@ -35,7 +137,7 @@ final class PaletteTests: XCTestCase {
             XCTAssertFalse(model.busy)
             let expected=separation == .keepShades || separation == .low ? 2 : 1
             XCTAssertEqual(model.settings.palette.count,expected)
-            XCTAssertTrue(model.status.contains("Extracted \(expected) of up to 4 colors"))
+            XCTAssertTrue(model.status.contains("Extracted \(expected) of up to 4 strand colors"))
         }
     }
 

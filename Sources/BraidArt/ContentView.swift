@@ -128,7 +128,7 @@ struct ContentView: View {
                     Slider(value:$model.zoom,in:0.25...4).frame(width:100)
                     Button("Fit") { model.zoom=1 }.controlSize(.small)
                 }.padding(22)
-                if project.settings != model.settings {
+                if model.resultNeedsWeaving {
                     Label("Showing the previous result. Weave again to apply the current settings.",systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,22).padding(.bottom,12)
                 }
                 GeometryReader { proxy in
@@ -174,7 +174,7 @@ struct ContentView: View {
                     Text("The red frame marks the exported area.").font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength:0)
                 }.padding(.horizontal,20).padding(.bottom,16)
-                if let project=model.project,project.settings != model.settings {
+                if model.resultNeedsWeaving {
                     Label("Showing the previous result. Weave again to apply the current settings.",systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).padding(.bottom,12)
                 }
                 Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,camera:model.cameraState,onCameraChanged:model.cameraChanged,onViewReady:model.register3DView)

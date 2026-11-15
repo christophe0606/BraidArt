@@ -42,7 +42,20 @@ and NASA’s media usage guidelines.
    details matter; the default maximum is six. Extraction uses the same crop,
    brightness, contrast and grayscale adjustments as the tile image. Projects
    without the original picture use their saved sampled image. Select **Extract**
-   after changing these settings. Edit any strand
+   after changing these settings. Extract also fits the background against the
+   prepared picture using the selected strands and their geometry. The background
+   must remain at least the **Background contrast** threshold from every retained
+   strand so none disappears into it. This slider ranges from 1 to 50 CIEDE2000
+   units, defaults to 15, and is saved with the project. Increase it for more
+   obvious strands, then select **Extract** to apply. **Reset** restores 15.
+   Extract preserves all strand colors when possible; if a
+   dense palette leaves no suitable background, it omits the fewest conflicting
+   colors found by the search. Within that visibility constraint it minimizes
+   sampled nearest-tile CIEDE2000 error, including the uncovered area of each tile;
+   this estimate does not include the solver's strand continuity constraints.
+   Luminance mode selects both the strand shades and background from the full
+   black-to-white range, without color casts.
+   Edit any strand
    or the background with its color picker. The tile library shows all `4 × colors²`
    combinations. **Luminance only**, contrast, brightness and alpha compositing
    are applied before sampling.

@@ -94,6 +94,12 @@ final class AppModel: ObservableObject {
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? "CPU fallback" }
     var tileData: TileData { TileData(settings:settings) }
     var preparedIsCurrent: Bool { prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true }
+    var resultNeedsWeaving: Bool {
+        guard var solved=project?.settings else { return false }
+        // The threshold affects the next Extract, not an existing weave.
+        solved.backgroundMinimumDistance=settings.backgroundMinimumDistance
+        return solved != settings
+    }
     init() { refreshTiles() }
 
     var paletteEntries: [PaletteEntry] {
@@ -194,19 +200,33 @@ final class AppModel: ObservableObject {
     }
     func extractPalette() {
         guard let image=prepared,!busy else { return }
-        activity = .extractingPalette;status="Finding palette colors…";let count=paletteCount,separation=paletteSeparation.minimumDistance
-        let includeAccents=paletteIncludeAccents,url=sourceURL,snapshot=settings
+        activity = .extractingPalette;status="Finding strand and background colors…";let count=paletteCount,separation=paletteSeparation.minimumDistance
+        let includeAccents=paletteIncludeAccents,url=sourceURL,snapshot=settings,current=preparedIsCurrent
         task=Task {
             do {
-                let palette=try await Task.detached {
+                let extracted=try await Task.detached {
+                    // A click immediately after an adjustment must use the latest
+                    // crop/contrast/grayscale, even before its debounced preview.
+                    var target=image
+                    if !current,let url { target=try ImageProcessor.prepare(url:url,settings:snapshot) }
+                    if snapshot.grayscale { target.pixels=target.pixels.map(BackgroundExtractor.neutral) }
+                    let palette:[RGB]
                     if includeAccents {
-                        let detailed=try url.map { try ImageProcessor.preparePalette(url:$0,settings:snapshot) } ?? image
-                        return PaletteExtractor.distinctColors(in:detailed,count:count,minimumDistance:separation)
+                        var detailed=try url.map { try ImageProcessor.preparePalette(url:$0,settings:snapshot) } ?? target
+                        if snapshot.grayscale { detailed.pixels=detailed.pixels.map(BackgroundExtractor.neutral) }
+                        palette=PaletteExtractor.distinctColors(in:detailed,count:count,minimumDistance:separation)
+                    } else {
+                        palette=PaletteExtractor.dominantColors(in:target,count:count,minimumDistance:separation)
                     }
-                    return PaletteExtractor.dominantColors(in:image,count:count,minimumDistance:separation)
-                }.value
-                replacePalette(palette);activity=nil;status="Extracted \(palette.count) of up to \(count) colors. Edit the palette below."
+                    var fitted=snapshot;fitted.palette=palette
+                    return try BackgroundExtractor.matching(target,settings:fitted)
+                }.valueWithCancellation()
+                try Task.checkCancellation()
+                replacePalette(extracted.palette);settings.background=extracted.background
+                activity=nil;status="Extracted \(extracted.palette.count) of up to \(count) strand colors and fitted the background. Edit the colors below."
                 settingsChanged()
+            } catch is CancellationError {
+                activity=nil;status="Color extraction cancelled. Previous colors retained."
             } catch { fail(error) }
         }
     }
@@ -253,6 +273,9 @@ final class AppModel: ObservableObject {
     }
     var projectForSaving:BraidProject? {
         guard var saved=project else { return nil }
+        // This is an extraction preference, so saving it does not replace the
+        // colors or geometry associated with the existing woven result.
+        saved.settings.backgroundMinimumDistance=settings.backgroundMinimumDistance
         saved.sceneSettings=sceneSettings;saved.cameraState=cameraState;saved.pictureExportSize=pictureExportSize
         return saved
     }

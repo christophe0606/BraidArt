@@ -33,6 +33,7 @@ public struct Crop: Codable, Equatable, Sendable {
 }
 
 public struct Settings: Codable, Equatable, Sendable {
+    public static let defaultBackgroundMinimumDistance=15.0
     public var crop = Crop()
     public var cropAspectRatio: PictureExportSize? = nil
     public var columns = 50
@@ -40,6 +41,7 @@ public struct Settings: Codable, Equatable, Sendable {
     public var strandWidth = 0.414
     public var gap = 0.4
     public var background = RGB.gray
+    public var backgroundMinimumDistance=Settings.defaultBackgroundMinimumDistance
     public var palette: [RGB] = [.black, .white]
     public var grayscale = false
     public var contrast = 1.0
@@ -49,6 +51,29 @@ public struct Settings: Codable, Equatable, Sendable {
     public var relativeGap = 0.01
     public var threads = 4
     public init() {}
+    private enum CodingKeys:String,CodingKey {
+        case crop,cropAspectRatio,columns,partitionSize,strandWidth,gap,background,backgroundMinimumDistance,palette
+        case grayscale,contrast,brightness,alphaBackground,secondsPerPartition,relativeGap,threads
+    }
+    public init(from decoder:Decoder) throws {
+        let values=try decoder.container(keyedBy:CodingKeys.self)
+        crop=try values.decode(Crop.self,forKey:.crop)
+        cropAspectRatio=try values.decodeIfPresent(PictureExportSize.self,forKey:.cropAspectRatio)
+        columns=try values.decode(Int.self,forKey:.columns)
+        partitionSize=try values.decode(Int.self,forKey:.partitionSize)
+        strandWidth=try values.decode(Double.self,forKey:.strandWidth)
+        gap=try values.decode(Double.self,forKey:.gap)
+        background=try values.decode(RGB.self,forKey:.background)
+        backgroundMinimumDistance=try values.decodeIfPresent(Double.self,forKey:.backgroundMinimumDistance) ?? Self.defaultBackgroundMinimumDistance
+        palette=try values.decode([RGB].self,forKey:.palette)
+        grayscale=try values.decode(Bool.self,forKey:.grayscale)
+        contrast=try values.decode(Double.self,forKey:.contrast)
+        brightness=try values.decode(Double.self,forKey:.brightness)
+        alphaBackground=try values.decode(RGB.self,forKey:.alphaBackground)
+        secondsPerPartition=try values.decode(Double.self,forKey:.secondsPerPartition)
+        relativeGap=try values.decode(Double.self,forKey:.relativeGap)
+        threads=try values.decode(Int.self,forKey:.threads)
+    }
     public func hasSameImagePreparation(as other: Settings) -> Bool {
         crop == other.crop && columns == other.columns && grayscale == other.grayscale &&
         contrast == other.contrast && brightness == other.brightness && alphaBackground == other.alphaBackground
@@ -57,7 +82,8 @@ public struct Settings: Codable, Equatable, Sendable {
         guard crop.valid, (8...256).contains(columns), (1...20).contains(partitionSize),
               (0.1...0.6).contains(strandWidth), (0...0.6).contains(gap), strandWidth+gap <= 0.98,
               (1...8).contains(palette.count), palette.allSatisfy(\.valid), Set(palette).count == palette.count,
-              background.valid, alphaBackground.valid, (0.25...3).contains(contrast), (-0.5...0.5).contains(brightness),
+              background.valid, (1...50).contains(backgroundMinimumDistance), alphaBackground.valid,
+              (0.25...3).contains(contrast), (-0.5...0.5).contains(brightness),
               (1...600).contains(secondsPerPartition), (0...0.2).contains(relativeGap), (1...16).contains(threads)
         else { throw BraidError.invalid("Invalid image, palette, geometry, or solver settings.") }
     }
