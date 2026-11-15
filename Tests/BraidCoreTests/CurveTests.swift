@@ -42,6 +42,44 @@ final class CurveTests:XCTestCase {
             } else { XCTAssertTrue(segments.allSatisfy{$0.points.count==4 && !$0.raised}) }
         }
     }
+    func testRasterCurvesJoinStraightStrandsAtEveryTileEdge() throws {
+        var failures=[String]()
+        for width in [0.1,0.25,0.414,0.6] {
+            var settings=Settings();settings.strandWidth=width;settings.gap=min(0.4,0.98-width)
+            settings.background = .white;settings.palette=[RGB(0.1,0.2,0.3),RGB(0.9,0.1,0.2)]
+            let data=TileData(settings:settings)
+            for size in [20,50,100] {
+                let images=try data.allTiles.map { try ImageProcessor.pixels(from:TileRenderer.tile($0,data:data,size:size)) }
+                func edge(_ tile:Tile,_ side:Int)->[RGB] {
+                    let pixels=images[tile.id-1].pixels
+                    return (0..<size).map { i in
+                        pixels[side==0 ? i : side==1 ? i*size+size-1 : side==2 ? (size-1)*size+i : i*size]
+                    }
+                }
+                for tile in data.allTiles where tile.kind == .circLeft || tile.kind == .circRight {
+                    for (side,color) in [tile.top,tile.right,tile.bottom,tile.left].enumerated() {
+                        let straight=try XCTUnwrap(data.allTiles.first {
+                            side%2==0 ? $0.kind == .vCross && $0.secondColor==color : $0.kind == .hCross && $0.firstColor==color
+                        })
+                        let profile=edge(tile,side),reference=edge(straight,side)
+                        // Just inside a circular tangent, an exact-boundary subpixel
+                        // sample can differ from the straight edge by half a pixel.
+                        let difference=zip(profile,reference).reduce(0.0) {
+                            $0+max(abs($1.0.r-$1.1.r),abs($1.0.g-$1.1.g),abs($1.0.b-$1.1.b))
+                        }
+                        if difference>0.5+3.0/255 { failures.append("\(tile.kind) edge \(side), width \(width), size \(size): \(difference)") }
+                        if reference != Array(reference.reversed()) { failures.append("Off-center straight strand at width \(width), size \(size)") }
+                    }
+                }
+            }
+        }
+        let project=try fixture()
+        let image=try TileRenderer.render(solution:project.result.solution,data:project.tileData,tileSize:100)
+        let folder=URL(fileURLWithPath:FileManager.default.currentDirectoryPath).appendingPathComponent(".build/curve-validation")
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        try ImageProcessor.writePNG(image,to:folder.appendingPathComponent("png-joins.png"))
+        XCTAssertTrue(failures.isEmpty,"\(failures.count) misaligned edge profiles: \(failures.prefix(8).joined(separator:"; "))")
+    }
     func testClosedLoopAndEveryPieceExactlyOnce() throws {
         let data=TileData(settings:Settings())
         let braid=try CurveGenerator.generate(solution:[[9,13],[13,9]],data:data)

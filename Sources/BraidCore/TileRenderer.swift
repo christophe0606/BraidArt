@@ -2,27 +2,26 @@ import Foundation
 import CoreGraphics
 
 public enum TileRenderer {
-    /// Notebook drawing geometry, in top-left coordinates. The small drawing offsets
-    /// match drawVCross/drawHCross/drawCircLeft/drawCircRight, independently of analytic area weights.
+    /// Centered, constant-width strands in top-left coordinates. All four tile kinds
+    /// meet at the same edge midpoints with matching widths and tangent directions.
     private static func colorAt(x: Double, y: Double, tile: Tile, data: TileData) -> RGB {
         let w=data.strandWidth, gap=data.gap, bg=data.background
         let a=data.palette[tile.firstColor],b=data.palette[tile.secondColor]
-        let d=0.04, start=(0.5-w/2)+d/2, thickness=w-d/2, end=(1-w-gap)/2
+        let start=(1-w)/2,finish=(1+w)/2,end=(1-w-gap)/2
         switch tile.kind {
         case .vCross:
-            if x>=start && x<=start+thickness { return b }
-            if y>=start && y<=start+thickness && (x<=end || x>=(1+w+gap)/2) { return a }
+            if x>=start && x<=finish { return b }
+            if y>=start && y<=finish && (x<=end || x>=(1+w+gap)/2) { return a }
         case .hCross:
-            if y>=start && y<=start+thickness { return a }
-            if x>=start && x<=start+thickness && (y<=end || y>=(1+w+gap)/2) { return b }
+            if y>=start && y<=finish { return a }
+            if x>=start && x<=finish && (y<=end || y>=(1+w+gap)/2) { return b }
         case .circLeft, .circRight:
-            // arc uses d=1/50; radius=(diameter/2)-1/100.
-            let outer=(1+w+0.04)/2-0.01, inner=(1-w+0.02)/2-0.01
-            let cy1=tile.kind == .circLeft ? -0.01 : 1.0
-            let cy2=tile.kind == .circLeft ? 1.0 : -0.01
-            let r1=hypot(x+0.01,y-cy1),r2=hypot(x-1,y-cy2)
-            if r2>=inner && r2<=outer { return b }
-            if r1>=inner && r1<=outer { return a }
+            // Quarter circles have radius 1/2 and centers exactly at tile corners.
+            let cy1=tile.kind == .circLeft ? 0.0 : 1.0
+            let cy2=tile.kind == .circLeft ? 1.0 : 0.0
+            let r1=hypot(x,y-cy1),r2=hypot(x-1,y-cy2)
+            if r2>=start && r2<=finish { return b }
+            if r1>=start && r1<=finish { return a }
         }
         return bg
     }

@@ -41,9 +41,11 @@ VCross, HCross, CircLeft, CircRight, with all ordered palette pairs inside each.
 
 The average is `(1−weightA−weightB)g + weightA*a + weightB*b` in encoded sRGB,
 matching notebook arithmetic. Default width is 0.414 and gap 0.4. Analytic weights
-are intentionally distinct from raster coverage: the notebook also uses drawing
-insets that do not appear in its average-color formula. Four subpixel samples
-smooth the native tile raster. Width is limited to 0.6 and width+gap to 0.98 to
+are intentionally distinct from raster coverage. The native raster uses centered
+straight strands and quarter circles of radius 1/2, all with width `w`, so adjoining
+tiles meet smoothly. The notebook's small drawing offsets and unequal widths are
+omitted to avoid steps at curved-to-straight joins. Four subpixel samples smooth
+the native tile raster. Width is limited to 0.6 and width+gap to 0.98 to
 keep weights and strand geometry valid.
 
 ## Optimization
