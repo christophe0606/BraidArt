@@ -74,7 +74,6 @@ final class AppModel: ObservableObject {
     @Published var paletteCount=6
     @Published var paletteSeparation=PaletteSeparation.medium
     @Published var paletteIncludeAccents=true
-    @Published var exportTileSize=50
     @Published var zoom=1.0
     @Published var curves: BraidCurves?
     @Published var meshes: [TubeMesh]=[]
@@ -90,6 +89,7 @@ final class AppModel: ObservableObject {
     private var sourceURL: URL?
     private var task: Task<Void,Never>?
     private var previewTask: Task<Void,Never>?
+    private var resultPreviewTask: Task<Void,Never>?
     private var preparedSettings: BraidCore.Settings?
     private var revision=0
     private var cachedTileData: TileData?
@@ -102,6 +102,8 @@ final class AppModel: ObservableObject {
         guard var solved=project?.settings else { return false }
         // The threshold affects the next Extract, not an existing weave.
         solved.backgroundMinimumDistance=settings.backgroundMinimumDistance
+        // Pixel dimensions are an export preference; the crop determines the weave.
+        solved.outputSize=settings.outputSize
         return solved != settings
     }
     init() { refreshTiles() }
@@ -136,14 +138,14 @@ final class AppModel: ObservableObject {
     }
     func open(url: URL) {
         guard !busy else { return }
-        task?.cancel();previewTask?.cancel();revision+=1
+        task?.cancel();previewTask?.cancel();resultPreviewTask?.cancel();revision+=1
         if url.pathExtension.lowercased()=="braidart" || url.pathExtension.lowercased()=="json" { loadProject(url);return }
         activity = .exclusive;status=L("Opening image…");let rev=revision
         task=Task {
             do {
                 let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.value
                 guard rev==revision else { return }
-                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.nsImage;clearCrop()
+                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.nsImage;resetCrop()
                 prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;activity=nil
                 prepare()
             } catch { fail(error) }
@@ -162,11 +164,14 @@ final class AppModel: ObservableObject {
         }
     }
     var cropAspectRatio: Double? {
-        sourceImage.flatMap { CropGeometry.normalizedAspectRatio(for:settings.cropAspectRatio,imageSize:$0.size) }
+        sourceImage.flatMap { CropGeometry.normalizedAspectRatio(for:settings.outputSize,imageSize:$0.size) }
     }
-    func setCropAspectRatio(_ preset:PictureExportSize?) {
-        settings.cropAspectRatio=preset
-        guard sourceImage != nil,hasCropSelection || preset != nil else { return }
+    func setOutputSize(_ preset:PictureExportSize) {
+        guard preset != .viewport,preset != settings.outputSize else { return }
+        let previousRatio=cropAspectRatio
+        settings.outputSize=preset
+        refreshResultImage()
+        guard sourceImage != nil,previousRatio != cropAspectRatio else { return }
         settings.crop=CropGeometry.fitted(hasCropSelection ? settings.crop : Crop(),aspectRatio:cropAspectRatio)
         hasCropSelection=true
     }
@@ -174,8 +179,23 @@ final class AppModel: ObservableObject {
         guard hasCropSelection,!blocksEditing else { return }
         settings.crop=CropGeometry.scaled(settings.crop,by:factor)
     }
-    func clearCrop() {
-        hasCropSelection=false;settings.crop=Crop()
+    func resetCrop() {
+        settings.crop=CropGeometry.fitted(Crop(),aspectRatio:cropAspectRatio)
+        hasCropSelection=sourceImage != nil
+    }
+    private func refreshResultImage() {
+        resultPreviewTask?.cancel()
+        guard let project else { return }
+        let size=settings.outputPixelSize
+        resultPreviewTask=Task {
+            do {
+                let image=try await Task.detached {
+                    try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size)
+                }.valueWithCancellation()
+                try Task.checkCancellation()
+                resultImage=image.nsImage
+            } catch is CancellationError {} catch { self.error=error.localizedDescription }
+        }
     }
     func refreshTiles() {
         guard (try? settings.validate()) != nil else { return }
@@ -236,6 +256,7 @@ final class AppModel: ObservableObject {
     }
     func solve() {
         guard !busy,let image=prepared,let executable=solverURL else { return }
+        resultPreviewTask?.cancel()
         let snapshot=settings,name=sourceName
         activity = .exclusive;progress=0;selectedTab=2;status=L("Starting solver…")
         previewTask?.cancel()
@@ -248,7 +269,7 @@ final class AppModel: ObservableObject {
                 }.valueWithCancellation()
                 try Task.checkCancellation()
                 let result=output.1,data=output.0
-                let rendered=try await Task.detached{try TileRenderer.render(solution:result.solution,data:data,tileSize:min(40,max(8,3200/max(image.width,image.height))))}.value
+                let rendered=try await Task.detached{try TileRenderer.render(solution:result.solution,data:data,pixelSize:snapshot.outputPixelSize)}.value
                 let generated=try await Task.detached { try CurveGenerator.generate(solution:result.solution,data:data) }.value
                 let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
                 cameraState=nil;curves=generated;meshes=tubes;curveGeneration+=1
@@ -280,6 +301,7 @@ final class AppModel: ObservableObject {
         // This is an extraction preference, so saving it does not replace the
         // colors or geometry associated with the existing woven result.
         saved.settings.backgroundMinimumDistance=settings.backgroundMinimumDistance
+        saved.settings.outputSize=settings.outputSize
         saved.sceneSettings=sceneSettings;saved.cameraState=cameraState;saved.pictureExportSize=pictureExportSize
         return saved
     }
@@ -288,7 +310,7 @@ final class AppModel: ObservableObject {
         task=Task {
             do {
                 let loaded=try await Task.detached { try BraidProject.load(from:url) }.value
-                let rendered=try await Task.detached{try TileRenderer.render(solution:loaded.result.solution,data:loaded.tileData,tileSize:min(40,max(8,3200/max(loaded.sampledImage.width,loaded.sampledImage.height))))}.value
+                let rendered=try await Task.detached{try TileRenderer.render(solution:loaded.result.solution,data:loaded.tileData,pixelSize:loaded.settings.outputPixelSize)}.value
                 let generated=try await Task.detached { try CurveGenerator.generate(solution:loaded.result.solution,data:loaded.tileData) }.value
                 let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
                 curves=generated;meshes=tubes;curveGeneration+=1
@@ -307,10 +329,10 @@ final class AppModel: ObservableObject {
         guard let project=project,!busy else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.png";panel.allowedContentTypes=[.png]
         guard panel.runModal() == .OK,let url=panel.url else { return }
-        let size=exportTileSize;activity = .exclusive;status=L("Exporting PNG…")
+        let size=settings.outputPixelSize;activity = .exclusive;status=L("Exporting PNG…")
         task=Task {
             do {
-                try await Task.detached { let cg=try TileRenderer.render(solution:project.result.solution,data:project.tileData,tileSize:size);try ImageProcessor.writePNG(cg,to:url) }.value
+                try await Task.detached { let cg=try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size);try ImageProcessor.writePNG(cg,to:url) }.value
                 activity=nil;status=L("Saved %@", String(describing: url.lastPathComponent))
             } catch { fail(error) }
         }
@@ -322,10 +344,10 @@ final class AppModel: ObservableObject {
         guard panel.runModal() == .OK,let parent=panel.url else { return }
         var folder=parent.appendingPathComponent("\(baseName)-braid-data",isDirectory:true);var n=2
         while FileManager.default.fileExists(atPath:folder.path) { folder=parent.appendingPathComponent("\(baseName)-braid-data-\(n)",isDirectory:true);n+=1 }
-        let destination=folder,size=exportTileSize;activity = .exclusive;status=L("Exporting solution and tiles…")
+        let destination=folder;activity = .exclusive;status=L("Exporting solution and tiles…")
         task=Task {
             do {
-                try await Task.detached { try ProjectExporter.export(project,to:destination,tileSize:size) }.value
+                try await Task.detached { try ProjectExporter.export(project,to:destination) }.value
                 activity=nil;status=L("Exported %@", String(describing: destination.lastPathComponent));NSWorkspace.shared.activateFileViewerSelecting([destination])
             } catch { fail(error) }
         }

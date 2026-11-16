@@ -1,5 +1,6 @@
 import XCTest
 import CoreGraphics
+import ImageIO
 @testable import BraidCore
 
 final class CoreTests: XCTestCase {
@@ -81,11 +82,14 @@ final class CoreTests: XCTestCase {
         let project=BraidProject(sourceName:"fixture.png",settings:settings,sampledImage:input,tileData:data,result:result)
         let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at:folder) }
-        try ProjectExporter.export(project,to:folder,tileSize:20)
+        try ProjectExporter.export(project,to:folder)
         let loaded=try BraidProject.load(from:folder.appendingPathComponent("project.braidart"))
         XCTAssertEqual(loaded.result,result);XCTAssertEqual(loaded.tileData,data);XCTAssertEqual(loaded.sampledImage,input)
         let files=try FileManager.default.contentsOfDirectory(atPath:folder.appendingPathComponent("tiles").path)
         XCTAssertEqual(files.count,16)
+        let preview=try XCTUnwrap(CGImageSourceCreateWithURL(folder.appendingPathComponent("result.png") as CFURL,nil))
+        let exported=try XCTUnwrap(CGImageSourceCreateImageAtIndex(preview,0,nil))
+        XCTAssertEqual(exported.width,1920);XCTAssertEqual(exported.height,1080)
         let wl=try String(contentsOf:folder.appendingPathComponent("data.wl"),encoding:.utf8)
         XCTAssertTrue(wl.contains("DarkKnot[VCross[{RGBColor["));XCTAssertTrue(wl.contains("\"allTilesImg\" -> {Import["))
     }

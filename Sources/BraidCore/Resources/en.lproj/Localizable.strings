@@ -327,3 +327,8 @@
 "Workspace" = "Workspace";
 "Writing colored USDZ meshes…" = "Writing colored USDZ meshes…";
 "Zoom" = "Zoom";
+"Output dimensions" = "Output dimensions";
+"Reset Crop" = "Reset Crop";
+"Tile size: %.2f × %.2f px" = "Tile size: %.2f × %.2f px";
+"Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Drag outside the crop to draw another rectangle. Reset Crop restores the largest crop." = "Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Drag outside the crop to draw another rectangle. Reset Crop restores the largest crop.";
+"Drag inside the crop to move it, or drag one of its eight handles to resize. Pinch to scale. Press Delete to reset the crop." = "Drag inside the crop to move it, or drag one of its eight handles to resize. Pinch to scale. Press Delete to reset the crop.";

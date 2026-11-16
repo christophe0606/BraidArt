@@ -15,7 +15,6 @@ struct SidebarState: Equatable {
     let paletteCount: Int
     let paletteSeparation: PaletteSeparation
     let paletteIncludeAccents: Bool
-    let exportTileSize: Int
     let blocksEditing: Bool
 
     @MainActor init(model: AppModel) {
@@ -25,7 +24,7 @@ struct SidebarState: Equatable {
         preparedSize=model.prepared.map { CGSize(width:$0.width,height:$0.height) }
         hasProject=model.project != nil;solverURL=model.solverURL
         paletteCount=model.paletteCount;paletteSeparation=model.paletteSeparation
-        paletteIncludeAccents=model.paletteIncludeAccents;exportTileSize=model.exportTileSize
+        paletteIncludeAccents=model.paletteIncludeAccents
         blocksEditing=model.blocksEditing
     }
 }
@@ -47,14 +46,21 @@ struct SettingsSidebar: View, Equatable {
                     Button(action:model.chooseImage) { Label(L("Open Image or Project…"),systemImage:"photo.on.rectangle") }.controlSize(.large).frame(maxWidth:.infinity)
                     Text(L("Or drop an image anywhere in this window.")).font(.caption).foregroundStyle(.secondary)
                     if !state.sourceName.isEmpty { Text(state.sourceName).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
+                    Picker(L("Output dimensions"),selection:Binding(get:{state.settings.outputSize},set:{model.setOutputSize($0)})) {
+                        ForEach(PictureExportSize.outputSizes) { size in Text(size.title).tag(size) }
+                    }
                     Stepper(L("Image width: %@ tiles", String(describing: state.settings.columns)),value:binding(\.settings.columns),in:8...256,step:2).disabled(!state.hasSourceImage)
                     if let size=state.preparedSize { Text(L("%@ × %@ = %@ tiles", String(describing: Int(size.width)), String(describing: Int(size.height)), String(describing: Int(size.width*size.height)))).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
+                    if let size=state.preparedSize {
+                        Text(String(format:L("Tile size: %.2f × %.2f px"),state.settings.outputPixelSize.width/size.width,state.settings.outputPixelSize.height/size.height))
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    }
                     Toggle(L("Luminance only"),isOn:binding(\.settings.grayscale)).disabled(!state.hasSourceImage)
                     slider(L("Contrast"),value:binding(\.settings.contrast),in:0.25...3,resetTo:BraidCore.Settings().contrast).disabled(!state.hasSourceImage)
                     slider(L("Brightness"),value:binding(\.settings.brightness),in:-0.5...0.5,resetTo:BraidCore.Settings().brightness).disabled(!state.hasSourceImage)
                     if state.hasSourceImage {
                         ColorPicker(L("Transparent areas"),selection:colorBinding(\.alphaBackground),supportsOpacity:false)
-                        Button(L("Delete Crop"),action:model.clearCrop).font(.caption).disabled(!state.hasCropSelection)
+                        Button(L("Reset Crop"),action:model.resetCrop).font(.caption).disabled(!state.hasCropSelection)
                     } else if state.hasProject {
                         Text(L("This project contains the sampled image. Open the original picture to change the crop or resize.")).font(.caption).foregroundStyle(.secondary)
                     }
@@ -121,9 +127,8 @@ struct SettingsSidebar: View, Equatable {
                     }
                 }
                 section("04", L("Save & export")) {
-                    Picker(L("PNG tile size"),selection:binding(\.exportTileSize)) {
-                        Text(L("20 px")).tag(20);Text(L("50 px")).tag(50);Text(L("100 px")).tag(100)
-                    }
+                    Text(L("%@ × %@ pixels · PNG",String(Int(state.settings.outputPixelSize.width)),String(Int(state.settings.outputPixelSize.height))))
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     Button(L("Save Project…"),action:model.saveProject).disabled(!state.hasProject)
                     Text(L("Choose File → Export for all export formats.")).font(.caption).foregroundStyle(.secondary)
                     Text(L("Data export includes JSON, Wolfram data and tile images for subsequent processing.")).font(.caption).foregroundStyle(.secondary)

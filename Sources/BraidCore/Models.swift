@@ -35,7 +35,8 @@ public struct Crop: Codable, Equatable, Sendable {
 public struct Settings: Codable, Equatable, Sendable {
     public static let defaultBackgroundMinimumDistance=15.0
     public var crop = Crop()
-    public var cropAspectRatio: PictureExportSize? = nil
+    public var outputSize: PictureExportSize = .fullHD
+    public var outputPixelSize: CGSize { outputSize.pixelSize(viewport:.zero) }
     public var columns = 50
     public var partitionSize = 7
     public var strandWidth = 0.414
@@ -52,13 +53,16 @@ public struct Settings: Codable, Equatable, Sendable {
     public var threads = 4
     public init() {}
     private enum CodingKeys:String,CodingKey {
-        case crop,cropAspectRatio,columns,partitionSize,strandWidth,gap,background,backgroundMinimumDistance,palette
+        case crop,outputSize,columns,partitionSize,strandWidth,gap,background,backgroundMinimumDistance,palette
         case grayscale,contrast,brightness,alphaBackground,secondsPerPartition,relativeGap,threads
     }
     public init(from decoder:Decoder) throws {
         let values=try decoder.container(keyedBy:CodingKeys.self)
         crop=try values.decode(Crop.self,forKey:.crop)
-        cropAspectRatio=try values.decodeIfPresent(PictureExportSize.self,forKey:.cropAspectRatio)
+        let legacy=try decoder.container(keyedBy:LegacyCodingKeys.self)
+        let size=try values.decodeIfPresent(PictureExportSize.self,forKey:.outputSize)
+            ?? legacy.decodeIfPresent(PictureExportSize.self,forKey:.cropAspectRatio) ?? .fullHD
+        outputSize=size == .viewport ? .fullHD : size
         columns=try values.decode(Int.self,forKey:.columns)
         partitionSize=try values.decode(Int.self,forKey:.partitionSize)
         strandWidth=try values.decode(Double.self,forKey:.strandWidth)
@@ -74,12 +78,13 @@ public struct Settings: Codable, Equatable, Sendable {
         relativeGap=try values.decode(Double.self,forKey:.relativeGap)
         threads=try values.decode(Int.self,forKey:.threads)
     }
+    private enum LegacyCodingKeys:String,CodingKey { case cropAspectRatio }
     public func hasSameImagePreparation(as other: Settings) -> Bool {
         crop == other.crop && columns == other.columns && grayscale == other.grayscale &&
         contrast == other.contrast && brightness == other.brightness && alphaBackground == other.alphaBackground
     }
     public func validate() throws {
-        guard crop.valid, (8...256).contains(columns), (1...20).contains(partitionSize),
+        guard outputSize != .viewport, crop.valid, (8...256).contains(columns), (1...20).contains(partitionSize),
               (0.1...0.6).contains(strandWidth), (0...0.6).contains(gap), strandWidth+gap <= 0.98,
               (1...8).contains(palette.count), palette.allSatisfy(\.valid), Set(palette).count == palette.count,
               background.valid, (1...50).contains(backgroundMinimumDistance), alphaBackground.valid,

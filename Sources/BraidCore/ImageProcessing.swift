@@ -25,7 +25,7 @@ public enum ImageProcessor {
         try settings.validate()
         guard var image=CIImage(contentsOf:url,options:[.applyOrientationProperty:true]) else { throw BraidError.invalid(L("Cannot decode the selected image.")) }
         let e=image.extent,c=settings.crop
-        let rect=CGRect(x:e.minX+c.x*e.width,y:e.minY+(1-c.y-c.height)*e.height,width:c.width*e.width,height:c.height*e.height).integral.intersection(e)
+        let rect=CGRect(x:e.minX+c.x*e.width,y:e.minY+(1-c.y-c.height)*e.height,width:c.width*e.width,height:c.height*e.height).intersection(e)
         guard !rect.isEmpty else { throw BraidError.invalid(L("The crop is empty.")) }
         image=image.cropped(to:rect).transformed(by:CGAffineTransform(translationX:-rect.minX,y:-rect.minY))
         let width:Int,height:Int

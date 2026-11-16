@@ -70,10 +70,9 @@ struct ContentView: View {
                 if let image=model.sourceImage {
                     Text(L("SOURCE & CROP")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     HStack(spacing:12) {
-                        Picker(L("Aspect ratio"),selection:Binding(get:{model.settings.cropAspectRatio},set:{model.setCropAspectRatio($0)})) {
-                            Text(L("Free")).tag(PictureExportSize?.none)
-                            ForEach(PictureExportSize.allCases.filter { $0 != .viewport }) { preset in
-                                Text(preset.title).tag(Optional(preset))
+                        Picker(L("Output dimensions"),selection:Binding(get:{model.settings.outputSize},set:{model.setOutputSize($0)})) {
+                            ForEach(PictureExportSize.outputSizes) { preset in
+                                Text(preset.title).tag(preset)
                             }
                         }.pickerStyle(.menu).frame(maxWidth:400)
                         Spacer(minLength:0)
@@ -81,11 +80,11 @@ struct ContentView: View {
                             .help(L("Scale crop down")).accessibilityLabel(L("Scale crop down")).disabled(!model.hasCropSelection)
                         Button { model.scaleCrop(by:1.1) } label: { Image(systemName:"plus.magnifyingglass") }
                             .help(L("Scale crop up")).accessibilityLabel(L("Scale crop up")).disabled(!model.hasCropSelection)
-                        Button(L("Delete Crop"),action:model.clearCrop).disabled(!model.hasCropSelection)
+                        Button(L("Reset Crop"),action:model.resetCrop).disabled(!model.hasCropSelection)
                     }.controlSize(.small).disabled(model.blocksEditing)
-                    CropEditor(image:image,crop:$model.settings.crop,hasSelection:$model.hasCropSelection,aspectRatio:model.cropAspectRatio,onDelete:model.clearCrop)
+                    CropEditor(image:image,crop:$model.settings.crop,hasSelection:$model.hasCropSelection,aspectRatio:model.cropAspectRatio,onDelete:model.resetCrop)
                         .frame(height:350).disabled(model.blocksEditing)
-                    Text(model.hasCropSelection ? L("Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Delete Crop to draw another rectangle.") : L("Drag on the picture to draw a crop rectangle."))
+                    Text(L("Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Drag outside the crop to draw another rectangle. Reset Crop restores the largest crop."))
                         .font(.caption).foregroundStyle(.secondary)
                     Text(model.hasCropSelection ? L("Crop: %@%% × %@%% of source", String(describing: Int(model.settings.crop.width*100)), String(describing: Int(model.settings.crop.height*100))) : L("Using the full picture."))
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)

@@ -119,14 +119,21 @@ final class CropTests: XCTestCase {
         }
     }
 
-    func testAspectRatioMetadataRoundTripsAndOlderSettingsStillDecode() throws {
-        var settings=Settings();settings.cropAspectRatio = .instagramPortrait
+    func testOutputDimensionsRoundTripAndOlderSettingsGetARequiredSize() throws {
+        var settings=Settings();settings.outputSize = .instagramPortrait
         let data=try JSONEncoder().encode(settings)
         XCTAssertEqual(try JSONDecoder().decode(Settings.self,from:data),settings)
         var json=try XCTUnwrap(JSONSerialization.jsonObject(with:data) as? [String:Any])
-        json.removeValue(forKey:"cropAspectRatio")
+        json.removeValue(forKey:"outputSize")
         let legacy=try JSONDecoder().decode(Settings.self,from:JSONSerialization.data(withJSONObject:json))
-        XCTAssertNil(legacy.cropAspectRatio)
+        XCTAssertEqual(legacy.outputSize,.fullHD)
         XCTAssertTrue(settings.hasSameImagePreparation(as:legacy),"The menu choice alone does not change the sampled pixels")
+        for preset in PictureExportSize.allCases {
+            json["cropAspectRatio"]=preset.rawValue
+            let migrated=try JSONDecoder().decode(Settings.self,from:JSONSerialization.data(withJSONObject:json))
+            XCTAssertEqual(migrated.outputSize,preset == .viewport ? .fullHD : preset)
+        }
+        settings.outputSize = .viewport
+        XCTAssertThrowsError(try settings.validate())
     }
 }

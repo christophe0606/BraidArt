@@ -9,7 +9,7 @@
 <key>CFBundleExecutable</key><string>BraidArt</string>
 <key>CFBundleIconFile</key><string>BraidArtIcon.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>1.0.0</string>
+<key>CFBundleShortVersionString</key><string>1.1.0</string>
 <key>CFBundleVersion</key><string>7</string>
 <key>NSHumanReadableCopyright</key><string>Copyright © 2026 Christophe Favergeon</string>
 <key>LSMinimumSystemVersion</key><string>14.0</string>

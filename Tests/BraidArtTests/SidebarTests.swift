@@ -3,27 +3,47 @@ import BraidCore
 @testable import BraidArt
 
 final class SidebarTests: XCTestCase {
-    @MainActor func testCropPresetScaleDeleteAndRedrawKeepTheSelectedFormat() throws {
+    @MainActor func testCropPresetScaleResetAndRedrawKeepTheSelectedFormat() throws {
         let model=AppModel()
         model.sourceImage=try XCTUnwrap(HelpIllustration.photograph.image)
-        model.setCropAspectRatio(.instagramPortrait)
+        model.setOutputSize(.instagramPortrait)
         XCTAssertTrue(model.hasCropSelection)
         let ratio=try XCTUnwrap(model.cropAspectRatio)
         XCTAssertEqual(model.settings.crop.width/model.settings.crop.height,ratio,accuracy:1e-12)
         model.scaleCrop(by:0.7)
         let smaller=model.settings.crop
         XCTAssertEqual(smaller.width/smaller.height,ratio,accuracy:1e-12)
-        model.clearCrop()
-        XCTAssertFalse(model.hasCropSelection)
-        XCTAssertEqual(model.settings.crop,Crop())
-        XCTAssertEqual(model.settings.cropAspectRatio,.instagramPortrait)
+        model.resetCrop()
+        XCTAssertTrue(model.hasCropSelection)
+        XCTAssertEqual(model.settings.crop,CropGeometry.fitted(Crop(),aspectRatio:ratio))
+        XCTAssertEqual(model.settings.outputSize,.instagramPortrait)
         model.settings.crop=try XCTUnwrap(CropGeometry.drawn(from:CGPoint(x:0.1,y:0.1),to:CGPoint(x:0.5,y:0.6),aspectRatio:model.cropAspectRatio))
         model.hasCropSelection=true
         XCTAssertEqual(model.settings.crop.width/model.settings.crop.height,ratio,accuracy:1e-12)
         let locked=model.settings.crop
-        model.setCropAspectRatio(nil)
+        model.setOutputSize(.viewport)
         XCTAssertEqual(model.settings.crop,locked)
-        XCTAssertNil(model.cropAspectRatio)
+        XCTAssertEqual(model.settings.outputSize,.instagramPortrait)
+        XCTAssertNotNil(model.cropAspectRatio)
+    }
+
+    @MainActor func testOpeningAnImageStartsWithTheLargestCenteredCropForEveryOutputSize() async throws {
+        let model=AppModel(),url=try XCTUnwrap(HelpIllustration.photograph.url)
+        XCTAssertEqual(model.settings.outputSize,.fullHD)
+        for preset in PictureExportSize.outputSizes {
+            model.setOutputSize(preset)
+            model.open(url:url)
+            try await waitForWork(model)
+            XCTAssertTrue(model.hasCropSelection)
+            let ratio=try XCTUnwrap(model.cropAspectRatio),crop=model.settings.crop
+            XCTAssertEqual(crop,CropGeometry.fitted(Crop(),aspectRatio:ratio))
+            XCTAssertEqual(crop.x+crop.width/2,0.5,accuracy:1e-10)
+            XCTAssertEqual(crop.y+crop.height/2,0.5,accuracy:1e-10)
+            XCTAssertEqual(max(crop.width,crop.height),1,accuracy:1e-10)
+            let image=try XCTUnwrap(model.sourceImage),size=model.settings.outputPixelSize
+            XCTAssertEqual(crop.width*image.size.width/(crop.height*image.size.height),size.width/size.height,accuracy:1e-10)
+            XCTAssertEqual(model.prepared?.height,Int((Double(model.settings.columns)*size.height/size.width).rounded()))
+        }
     }
 
     @MainActor private func waitForWork(_ model:AppModel) async throws {
@@ -31,6 +51,18 @@ final class SidebarTests: XCTestCase {
         while model.busy,ContinuousClock.now<deadline { try await Task.sleep(for:.milliseconds(10)) }
         XCTAssertFalse(model.busy)
         XCTAssertNil(model.error)
+    }
+
+    @MainActor func testChangingOnlyPixelDimensionsKeepsCropAndPreparedImageCurrent() async throws {
+        let model=AppModel(),url=try XCTUnwrap(HelpIllustration.photograph.url)
+        model.open(url:url)
+        try await waitForWork(model)
+        let crop=model.settings.crop,prepared=model.prepared
+        model.setOutputSize(.hd)
+        XCTAssertEqual(model.settings.crop,crop)
+        XCTAssertEqual(model.prepared,prepared)
+        XCTAssertTrue(model.preparedIsCurrent)
+        XCTAssertEqual(model.settings.outputPixelSize,CGSize(width:1280,height:720))
     }
 
     @MainActor func testContrastCompletionLeavesSidebarUnchangedAndLatestEditWins() async throws {

@@ -57,7 +57,7 @@ struct CropEditor: View {
                                 drag=CropDrag(operation:.move(crop))
                                 NSCursor.closedHand.set()
                             } else {
-                                return
+                                drag=CropDrag(operation:.draw(start))
                             }
                         } else {
                             drag=CropDrag(operation:.draw(start))
@@ -102,7 +102,7 @@ struct CropEditor: View {
         .onChange(of:hasSelection) { _,_ in draft=nil;drag=nil;scaleStart=nil }
         .onChange(of:crop) { _,_ in draft=nil;drag=nil;scaleStart=nil }
         .accessibilityLabel(L("Crop editor"))
-        .accessibilityHint(L("Drag inside the crop to move it, or drag one of its eight handles to resize. Pinch to scale. Press Delete to clear the crop."))
+        .accessibilityHint(L("Drag inside the crop to move it, or drag one of its eight handles to resize. Pinch to scale. Press Delete to reset the crop."))
     }
 
     private func commit() {

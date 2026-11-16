@@ -327,3 +327,8 @@
 "Workspace" = "Espace de travail";
 "Writing colored USDZ meshes…" = "Écriture des maillages USDZ en couleurs…";
 "Zoom" = "Zoom";
+"Output dimensions" = "Dimensions de sortie";
+"Reset Crop" = "Réinitialiser le recadrage";
+"Tile size: %.2f × %.2f px" = "Taille des tuiles : %.2f × %.2f px";
+"Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Drag outside the crop to draw another rectangle. Reset Crop restores the largest crop." = "Faites glisser l’intérieur pour déplacer, un bord ou un coin pour redimensionner. Pincez ou utilisez − / + pour changer l’échelle. Faites glisser à l’extérieur pour tracer un autre rectangle. Réinitialiser le recadrage restaure la zone maximale.";
+"Drag inside the crop to move it, or drag one of its eight handles to resize. Pinch to scale. Press Delete to reset the crop." = "Faites glisser l’intérieur du recadrage pour le déplacer, ou l’une de ses huit poignées pour le redimensionner. Pincez pour changer l’échelle. Appuyez sur Supprimer pour réinitialiser le recadrage.";

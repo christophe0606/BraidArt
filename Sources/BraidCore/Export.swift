@@ -2,8 +2,13 @@ import Foundation
 
 public enum ProjectExporter {
     /// A self-contained folder, including Wolfram-readable data and a PNG for every tile.
-    public static func export(_ project: BraidProject, to folder: URL, tileSize: Int = 50) throws {
+    public static func export(_ project: BraidProject, to folder: URL) throws {
         try project.validate()
+        let size=project.settings.outputPixelSize
+        // Individual tile PNGs require whole pixels; the assembled image is
+        // sampled separately to retain the exact requested output dimensions.
+        let tileSize=CGSize(width:max(1,(size.width/Double(project.sampledImage.width)).rounded()),
+                            height:max(1,(size.height/Double(project.sampledImage.height)).rounded()))
         guard !FileManager.default.fileExists(atPath:folder.path) else { throw BraidError.invalid(L("Export folder already exists. Choose a new name.")) }
         try FileManager.default.createDirectory(at:folder.appendingPathComponent("tiles"),withIntermediateDirectories:true)
         var complete=false
@@ -15,10 +20,10 @@ public enum ProjectExporter {
         try JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]).write(to:folder.appendingPathComponent("tileData.json"))
         try project.save(to:folder.appendingPathComponent("project.braidart"))
         for tile in project.tileData.allTiles {
-            let image=try TileRenderer.tile(tile,data:project.tileData,size:tileSize)
+            let image=try TileRenderer.tile(tile,data:project.tileData,pixelSize:tileSize)
             try ImageProcessor.writePNG(image,to:folder.appendingPathComponent("tiles/\(tileName(tile.id))"))
         }
-        let preview=try TileRenderer.render(solution:project.result.solution,data:project.tileData,tileSize:tileSize)
+        let preview=try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size)
         try ImageProcessor.writePNG(preview,to:folder.appendingPathComponent("result.png"))
         try ImageProcessor.writePNG(ImageProcessor.cgImage(project.sampledImage),to:folder.appendingPathComponent("sampled-image.png"))
         try wolfram(project).write(to:folder.appendingPathComponent("data.wl"),atomically:true,encoding:.utf8)
@@ -27,6 +32,7 @@ public enum ProjectExporter {
         solution.json: one-based tile IDs; rows top to bottom, columns left to right.
         tileData.json: tile ordering, colors (sRGB), strand geometry, edge color indices (zero-based), analytic average colors and topology groups.
         tiles/: rendered allTilesImg, one PNG per tile.
+        result.png: exact output dimensions selected in the project. Tile PNG dimensions are rounded to whole pixels and may not assemble to this exact size.
         data.wl: load with Get["/path/to/data.wl"] in Mathematica to restore solution and tileData, including allTilesImg.
         The symbols DarkKnot, VCross, HCross, CircLeft and CircRight retain the notebook representation.
         project.braidart: complete editable app project, including sampled image, settings and per-part solver reports.

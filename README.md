@@ -33,15 +33,20 @@ The About window links to the [original photograph](https://flic.kr/p/r9qvLn)
 and NASA’s media usage guidelines.
 
 1. Choose **Open Image or Project**, or drag an image file from Finder onto the
-   main window. Saved projects can also be dropped onto the window. Drag over the
-   source to draw a crop. Drag inside the rectangle to move it, or drag any edge
+   main window. Saved projects can also be dropped onto the window. Choose
+   **Output dimensions** (Full HD by default) to set the final woven PNG size and
+   its aspect ratio. Opening a picture displays the largest centered crop with
+   that ratio. Drag inside the rectangle to move it, or drag any edge
    or corner to resize it. Pinch or use the **− / +** buttons above the picture to
-   scale the crop while preserving its proportions. **Aspect ratio** offers Free
-   and the same fixed formats as 3D picture export; a selected ratio stays locked
-   when drawing, resizing or scaling. **Delete Crop** (or Delete while the crop
-   editor is focused) restores the full picture and lets you draw a new rectangle
-   using the selected ratio. Set the image width in tiles. The height
+   scale the crop while preserving its proportions. The ratio stays locked when
+   drawing, resizing or scaling. Drag outside the crop to draw another rectangle.
+   **Reset Crop** (or Delete while the crop editor is focused) restores the largest
+   centered crop with the selected ratio. Set the image width in tiles. The height
    follows the crop's aspect ratio, with a maximum of 256 tiles on either axis.
+   Tile size in pixels is calculated from the output dimensions and tile count;
+   there is no separate PNG tile size setting. Fractional tile sizes are supported
+   so the final PNG always has exactly the selected dimensions. 3D geometry still
+   uses one unit per tile; 3D camera pictures retain their separate size picker.
 2. Start with black and white strands over a gray background, or set a maximum
    of two to eight colors and select **Extract** to find representative colors
    in the cropped image. **Color separation** controls how similar shades are
@@ -82,10 +87,12 @@ and NASA’s media usage guidelines.
    in the 3D view; older projects without a saved camera open in Result.
    The original full-resolution source picture is not embedded.
    All export commands are in **File → Export**, directly below
-   **Save…**. **Result as PNG…** renders a higher-resolution picture.
+   **Save…**. **Result as PNG…** renders at the selected output dimensions.
    **Solution and Tile Data…** creates a self-contained folder of JSON, Wolfram data and tile
    PNGs. The export dialog chooses a parent directory and creates a fresh child
    folder without overwriting an earlier export.
+   Its `result.png` uses the same output dimensions. Individual tile PNG sizes
+   are derived from the grid and rounded to whole pixels.
 5. Open **3D** to view continuous, colored tube meshes rendered through Metal.
    Drag to rotate; Shift-drag, right-drag or middle-drag to pan; scroll or pinch
    to zoom. **Front / Fit** resets the camera; **Perspective** gives an angled

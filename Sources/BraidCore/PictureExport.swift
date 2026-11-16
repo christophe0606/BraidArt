@@ -4,6 +4,8 @@ import CoreGraphics
 public enum PictureExportSize: String, Codable, CaseIterable, Identifiable, Sendable {
     case viewport, hd, fullHD, ultraHD, instagramSquare, instagramPortrait, instagramTallPortrait, instagramLandscape, instagramStory
     public var id:String { rawValue }
+    /// Fixed dimensions available for the source crop and woven image.
+    public static var outputSizes:[Self] { allCases.filter { $0 != .viewport } }
     public var title:String {
         switch self {
         case .viewport: return L("Current viewport")

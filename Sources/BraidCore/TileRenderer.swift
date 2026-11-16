@@ -26,19 +26,51 @@ public enum TileRenderer {
         return bg
     }
     private static func raster(tile: Tile, data: TileData, size: Int) -> [UInt8] {
-        var bytes=[UInt8](repeating:255,count:size*size*4)
-        for y in 0..<size { for x in 0..<size {
+        raster(width:size,height:size) { x,y in colorAt(x:x/Double(size),y:y/Double(size),tile:tile,data:data) }
+    }
+    private static func raster(width:Int,height:Int,sample:(Double,Double)->RGB)->[UInt8] {
+        var bytes=[UInt8](repeating:255,count:width*height*4)
+        for y in 0..<height { for x in 0..<width {
             var color=RGB.black
             for dy in [0.25,0.75] { for dx in [0.25,0.75] {
-                color=color+colorAt(x:(Double(x)+dx)/Double(size),y:(Double(y)+dy)/Double(size),tile:tile,data:data)*0.25
+                color=color+sample(Double(x)+dx,Double(y)+dy)*0.25
             }}
-            let i=(y*size+x)*4
+            let i=(y*width+x)*4
             bytes[i]=UInt8((min(1,max(0,color.r))*255).rounded());bytes[i+1]=UInt8((min(1,max(0,color.g))*255).rounded());bytes[i+2]=UInt8((min(1,max(0,color.b))*255).rounded())
         }}
         return bytes
     }
     public static func tile(_ tile: Tile, data: TileData, size: Int = 64) throws -> CGImage {
         try makeImage(bytes:raster(tile:tile,data:data,size:size),width:size,height:size)
+    }
+    public static func tile(_ tile:Tile,data:TileData,pixelSize:CGSize) throws -> CGImage {
+        let (width,height)=try dimensions(pixelSize)
+        let bytes=raster(width:width,height:height) { x,y in
+            colorAt(x:x/Double(width),y:y/Double(height),tile:tile,data:data)
+        }
+        return try makeImage(bytes:bytes,width:width,height:height)
+    }
+    /// Sample directly at the requested dimensions, including fractional tile sizes.
+    /// Rounding the size of each tile first would change the final image dimensions.
+    public static func render(solution:[[Int]],data:TileData,pixelSize:CGSize) throws -> CGImage {
+        let (width,height)=try dimensions(pixelSize)
+        guard let columns=solution.first?.count,columns>0,!solution.isEmpty,
+              solution.allSatisfy({$0.count==columns}),
+              solution.joined().allSatisfy({(1...data.allTiles.count).contains($0)})
+        else { throw BraidError.invalid(L("Invalid render dimensions or tile IDs.")) }
+        let sx=Double(columns)/Double(width),sy=Double(solution.count)/Double(height)
+        let bytes=raster(width:width,height:height) { x,y in
+            let tx=x*sx,ty=y*sy,column=min(columns-1,Int(tx)),row=min(solution.count-1,Int(ty))
+            return colorAt(x:tx-Double(column),y:ty-Double(row),tile:data.allTiles[solution[row][column]-1],data:data)
+        }
+        return try makeImage(bytes:bytes,width:width,height:height)
+    }
+    private static func dimensions(_ size:CGSize) throws -> (Int,Int) {
+        guard size.width.isFinite,size.height.isFinite,size.width>=1,size.height>=1,
+              size.width.rounded()==size.width,size.height.rounded()==size.height,
+              size.width*size.height<=80_000_000
+        else { throw BraidError.invalid(L("Invalid render dimensions or tile IDs.")) }
+        return (Int(size.width),Int(size.height))
     }
     public static func render(solution: [[Int]], data: TileData, tileSize: Int = 40) throws -> CGImage {
         guard let columns=solution.first?.count, columns>0, !solution.isEmpty,
