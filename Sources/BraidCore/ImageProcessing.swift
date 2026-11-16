@@ -21,9 +21,22 @@ public enum ImageProcessor {
     public static func preparePalette(url: URL, settings: Settings) throws -> PixelImage {
         try prepare(url:url,settings:settings,forPalette:true)
     }
+    public static func prepare(image:CGImage,settings:Settings) throws -> PixelImage {
+        try prepare(image:CIImage(cgImage:image),settings:settings,forPalette:false)
+    }
+    public static func preparePalette(image:CGImage,settings:Settings) throws -> PixelImage {
+        try prepare(image:CIImage(cgImage:image),settings:settings,forPalette:true)
+    }
+    public static func prepare(image:CIImage,settings:Settings) throws -> PixelImage {
+        try prepare(image:image,settings:settings,forPalette:false)
+    }
     private static func prepare(url: URL, settings: Settings, forPalette: Bool) throws -> PixelImage {
+        guard let image=CIImage(contentsOf:url,options:[.applyOrientationProperty:true]) else { throw BraidError.invalid(L("Cannot decode the selected image.")) }
+        return try prepare(image:image,settings:settings,forPalette:forPalette)
+    }
+    private static func prepare(image source:CIImage,settings:Settings,forPalette:Bool) throws -> PixelImage {
         try settings.validate()
-        guard var image=CIImage(contentsOf:url,options:[.applyOrientationProperty:true]) else { throw BraidError.invalid(L("Cannot decode the selected image.")) }
+        var image=source
         let e=image.extent,c=settings.crop
         let rect=CGRect(x:e.minX+c.x*e.width,y:e.minY+(1-c.y-c.height)*e.height,width:c.width*e.width,height:c.height*e.height).intersection(e)
         guard !rect.isEmpty else { throw BraidError.invalid(L("The crop is empty.")) }

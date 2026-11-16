@@ -45,8 +45,8 @@ struct SettingsSidebar: View, Equatable {
                     VStack(alignment:.leading,spacing:2) { Text(L("BraidArt")).font(.title2.bold());Text(L("IMAGE TO WOVEN TILES")).font(.system(size:9,weight:.semibold,design:.monospaced)).tracking(1.5).foregroundStyle(.secondary) }
                 }.padding(.bottom,6)
                 section("01", L("Picture")) {
-                    Button(action:model.chooseImage) { Label(L("Open Image or Project…"),systemImage:"photo.on.rectangle") }.controlSize(.large).frame(maxWidth:.infinity)
-                    Text(L("Or drop an image anywhere in this window.")).font(.caption).foregroundStyle(.secondary)
+                    Button(action:model.chooseImage) { Label(L("Open Image, Video or Project…"),systemImage:"photo.on.rectangle") }.controlSize(.large).frame(maxWidth:.infinity)
+                    Text(L("Or drop an image or video anywhere in this window.")).font(.caption).foregroundStyle(.secondary)
                     if !state.sourceName.isEmpty { Text(state.sourceName).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
                     DimensionPicker(title:L("Output dimensions"),selection:Binding(get:{state.settings.outputSize},set:{model.setOutputSize($0)}),customDimensions:state.customDimensions,onManage:{model.dimensionManagerTarget = .output})
                     Stepper(L("Image width: %@ tiles", String(describing: state.settings.columns)),value:binding(\.settings.columns),in:8...256,step:2).disabled(!state.hasSourceImage)

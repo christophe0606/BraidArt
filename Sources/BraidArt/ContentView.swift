@@ -12,13 +12,13 @@ struct ContentView: View {
                 HStack {
                     Picker(L("Workspace"),selection:$model.selectedTab) {
                         Text(L("Prepare")).tag(0);Text(L("Tile Library")).tag(1);Text(L("Result")).tag(2);Text(L("3D")).tag(3)
-                    }.pickerStyle(.segmented).frame(width:380)
+                    }.pickerStyle(.segmented).labelsHidden().frame(width:380)
                     Spacer()
                     if model.blocksEditing {
                         Button(L("Cancel"),role:.cancel,action:model.cancel)
                     } else {
                         Button(action:model.solve) { Label(L("Weave Image"),systemImage:"play.fill") }.buttonStyle(.borderedProminent).tint(.orange)
-                            .disabled(model.busy || model.prepared==nil || model.solverURL==nil || !model.preparedIsCurrent || (try? model.settings.validate()) == nil)
+                            .disabled(!model.canWeavePicture)
                             .keyboardShortcut(.return,modifiers:.command)
                     }
                 }.padding(18).background(.bar)
@@ -47,7 +47,7 @@ struct ContentView: View {
             guard !model.busy,let url=urls.first(where: { url in
                 guard url.isFileURL else { return false }
                 let ext=url.pathExtension.lowercased()
-                return UTType(filenameExtension:ext)?.conforms(to:.image) == true || ext == "braidart" || ext == "json"
+                return UTType(filenameExtension:ext)?.conforms(to:.image) == true || VideoSource.isVideo(url) || ext == "braidart" || ext == "json"
             }) else { return false }
             model.open(url:url)
             return true
@@ -67,6 +67,14 @@ struct ContentView: View {
         .alert("BraidArt",isPresented:Binding(get:{model.error != nil},set:{if !$0 {model.error=nil}})) { Button(L("OK")) { model.error=nil } } message:{Text(model.error ?? "")}
     }
     private var prepareWorkspace: some View {
+        GeometryReader { workspace in
+        if model.sourceImage == nil && model.prepared == nil {
+            VStack(alignment:.leading,spacing:0) {
+                title(L("A picture, reimagined as strands."),subtitle:L("Crop the source, choose a tile resolution, then weave.")).padding(28)
+                emptyState(symbol:"photo.badge.plus",title:L("Start with an image or video"),detail:L("Drop a photograph, illustration or video here, or choose one. Each sample becomes a connected braid tile."),button:L("Open Image or Video…"),action:model.chooseImage)
+                    .frame(maxWidth:.infinity,maxHeight:.infinity)
+            }.frame(maxWidth:.infinity,maxHeight:.infinity)
+        } else {
         ScrollView {
             VStack(alignment:.leading,spacing:20) {
                 title(L("A picture, reimagined as strands."),subtitle:L("Crop the source, choose a tile resolution, then weave."))
@@ -82,14 +90,16 @@ struct ContentView: View {
                             .help(L("Scale crop up")).accessibilityLabel(L("Scale crop up")).disabled(!model.hasCropSelection)
                         Button(L("Reset Crop"),action:model.resetCrop).disabled(!model.hasCropSelection)
                     }.controlSize(.small).disabled(model.blocksEditing)
-                    CropEditor(image:image,crop:$model.settings.crop,hasSelection:$model.hasCropSelection,aspectRatio:model.cropAspectRatio,onDelete:model.resetCrop)
-                        .frame(height:350).disabled(model.blocksEditing)
+                    CropEditor(image:image,crop:$model.settings.crop,hasSelection:$model.hasCropSelection,aspectRatio:model.cropAspectRatio,onDelete:model.resetCrop,player:model.videoPlayback?.player)
+                        .frame(height:model.videoSource == nil ? 350 : max(140,min(350,workspace.size.height-430))).disabled(model.blocksEditing)
+                    if let video=model.videoSource,let segment=model.videoSegment,let playback=model.videoPlayback {
+                        VideoTimelineView(playback:playback,source:video,segment:segment,selectFrame:model.selectVideoFrame,
+                                          changeSegment:model.setVideoSegment,disabled:model.blocksEditing || model.activity == .extractingPalette)
+                    }
                     Text(L("Drag inside to move; drag an edge or corner to resize. Pinch or use − / + to scale. Drag outside the crop to draw another rectangle. Reset Crop restores the largest crop."))
                         .font(.caption).foregroundStyle(.secondary)
                     Text(model.hasCropSelection ? L("Crop: %@%% × %@%% of source", String(describing: Int(model.settings.crop.width*100)), String(describing: Int(model.settings.crop.height*100))) : L("Using the full picture."))
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                } else if model.prepared == nil {
-                    emptyState(symbol:"photo.badge.plus",title:L("Start with a picture"),detail:L("Drop a photograph or illustration here, or choose one. Each sample will become a connected braid tile."),button:L("Open Image…"),action:model.chooseImage).frame(height:360)
                 }
                 if let image=model.preparedImage {
                     HStack { Text(L("SAMPLED IMAGE")).font(.caption.weight(.semibold)).foregroundStyle(.secondary);Spacer();if let p=model.prepared {Text(L("%@ × %@", String(describing: p.width), String(describing: p.height))).font(.caption.monospacedDigit()).foregroundStyle(.secondary)} }
@@ -97,6 +107,8 @@ struct ContentView: View {
                     Text(L("One sample becomes one tile. The optimizer matches each tile’s average color to this image.")).font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(28)
+        }
+        }
         }
     }
     private var tileLibrary: some View {
@@ -116,6 +128,21 @@ struct ContentView: View {
     }
     private var resultWorkspace: some View {
         VStack(spacing:0) {
+            if model.videoSource != nil {
+                VStack(alignment:.leading,spacing:8) {
+                    ViewThatFits(in:.horizontal) {
+                        HStack(spacing:12) { videoWeaveButton;videoOutputOptions;Spacer(minLength:0) }
+                        VStack(alignment:.leading,spacing:10) { videoWeaveButton;videoOutputOptions }
+                    }
+                    if !model.canWeaveVideo && !model.busy {
+                        Text((try? VideoWeaver.validate(settings:model.settings)) == nil
+                             ? L("Video output width and height must be even numbers between 16 and 8192 pixels. Choose different output dimensions.")
+                             : L("Weave a frame with the current settings to enable video weaving."))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }.padding(.horizontal,22).padding(.vertical,14)
+                Divider()
+            }
             if let image=model.resultImage,let project=model.project {
                 HStack(spacing:20) {
                     VStack(alignment:.leading,spacing:4) {
@@ -146,6 +173,18 @@ struct ContentView: View {
                 emptyState(symbol:"square.grid.3x3",title:model.busy ? L("Weaving your image") : L("Ready to weave"),detail:model.busy ? L("Each part is solved with strand continuity constraints. Progress appears below.") : L("Prepare a picture and choose your palette, then select Weave Image."),button:nil,action:{}).frame(maxWidth:.infinity,maxHeight:.infinity)
             }
         }
+    }
+    private var videoWeaveButton:some View {
+        Button(action:model.weaveVideo) { Label(L("Weave Video…"),systemImage:"film") }
+            .buttonStyle(.borderedProminent).tint(.orange).disabled(!model.canWeaveVideo)
+    }
+    private var videoOutputOptions:some View {
+        HStack(spacing:12) {
+            Picker(L("Video format"),selection:$model.videoFormat) {
+                ForEach(VideoOutputFormat.allCases) { format in Text(format.title).tag(format) }
+            }.pickerStyle(.menu).fixedSize()
+            Toggle(L("Include audio"),isOn:$model.videoIncludeAudio).toggleStyle(.checkbox)
+        }.disabled(model.busy)
     }
     private var threeDWorkspace: some View {
         VStack(spacing:0) {

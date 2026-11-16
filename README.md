@@ -32,7 +32,7 @@ license documents and project/export data retain their original text.
 The About window links to the [original photograph](https://flic.kr/p/r9qvLn)
 and NASA’s media usage guidelines.
 
-1. Choose **Open Image or Project**, or drag an image file from Finder onto the
+1. Choose **Open Image, Video or Project**, or drag an image or video from Finder onto the
    main window. Saved projects can also be dropped onto the window. Choose
    **Output dimensions** (Full HD by default) to set the final woven PNG size and
    its aspect ratio. Opening a picture displays the largest centered crop with
@@ -49,8 +49,7 @@ and NASA’s media usage guidelines.
    uses one unit per tile; 3D camera pictures retain their separate size picker.
    The built-in list includes 720p, 1080p, 1440p, 4K UHD, 4K vertical, TikTok /
    YouTube Shorts (1080 × 1920), and Instagram Reels, feed, square and landscape
-   video formats. These names describe canvas dimensions; PNG exports remain
-   still images.
+   video formats. These names describe canvas dimensions for images and videos.
    Dimensions menus separate image, video and user-defined formats into groups.
    Use **Manage Dimensions…** (the sliders button beside either dimensions picker)
    to add a named size, or edit and delete your custom sizes. Built-in sizes are
@@ -104,7 +103,30 @@ and NASA’s media usage guidelines.
    folder without overwriting an earlier export.
    Its `result.png` uses the same output dimensions. Individual tile PNG sizes
    are derived from the grid and rounded to whole pixels.
-5. Open **3D** to view continuous, colored tube meshes rendered through Metal.
+5. For a video source, the timeline below the source picture has two orange
+   handles to trim the segment start/end and a playhead to select a test frame.
+   Click the timeline or drag the playhead to scrub. **Play segment** loops the
+   selected segment until you pause it. The crop remains visible and interactive
+   over the moving video, so you can resize or move it while watching the loop.
+   **Weave Image** captures the current playhead frame, pausing playback when
+   necessary. Color extraction also uses that frame. Weave a frame from the
+   selected segment and inspect it in **Result** before starting a video run.
+   **Weave Video…** and its format/audio controls appear only in **Result**.
+   Changing the processing settings requires another frame weave. Choose
+   **Most compatible (H.264 / MP4)**, **H.264 High Profile**, or **H.265 / HEVC**.
+   **Include audio** is enabled by default; turn it off to create a silent video.
+   The dimensions picker sets the exact movie dimensions; video width and height
+   must be even numbers from 16 to 8192 pixels.
+   **Weave Video…** asks for the destination before any video weaving starts.
+   Only the selected segment is decoded and solved, one frame at a time, with
+   the same fixed crop, palette and processing settings. Source timing is retained
+   relative to the segment start, including a partial first/last frame. When enabled, the first
+   audio track is re-encoded as stereo AAC. A progress window includes **Cancel**;
+   cancellation stops the solver and removes temporary output, preserving any
+   existing destination. The completed video is saved directly to the chosen MP4.
+   Saved projects retain a woven frame, not a link to the source video; reopen
+   the video and check a frame to start another video run.
+6. Open **3D** to view continuous, colored tube meshes rendered through Metal.
    Drag to rotate; Shift-drag, right-drag or middle-drag to pan; scroll or pinch
    to zoom. **Front / Fit** resets the camera; **Perspective** gives an angled
    view. Set the backing plane color and its clearance from the lowest tube.
@@ -122,7 +144,7 @@ and NASA’s media usage guidelines.
    The camera is frozen when you open the export panel, preserving your zoom,
    rotation and pan. A different output aspect ratio crops the visible view
    to the centered red frame without changing the live camera.
-6. **File → Export → Vector PDF…** writes a single page of filled strand contours with
+7. **File → Export → Vector PDF…** writes a single page of filled strand contours with
    fine black outlines, edged underpass ends and no embedded images. Generation
    starts after you choose a destination and click **Save**. A progress window
    includes **Cancel**; cancelling preserves any existing destination file.

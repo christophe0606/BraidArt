@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import BraidCore
+import AVFoundation
 
 struct CropEditor: View {
     let image: NSImage
@@ -8,6 +9,7 @@ struct CropEditor: View {
     @Binding var hasSelection: Bool
     let aspectRatio: Double?
     let onDelete: ()->Void
+    var player:AVPlayer?=nil
     @State private var drag: CropDrag?
     @State private var scaleStart: Crop?
     @State private var draft: Crop?
@@ -27,6 +29,10 @@ struct CropEditor: View {
                 Color.black.opacity(0.2)
                 Image(nsImage:image).resizable().frame(width:fitted.width,height:fitted.height)
                     .offset(x:fitted.minX,y:fitted.minY)
+                if let player {
+                    VideoPreview(player:player).frame(width:fitted.width,height:fitted.height)
+                        .offset(x:fitted.minX,y:fitted.minY).allowsHitTesting(false)
+                }
                 if let selection {
                     let rect=displayRect(selection,in:fitted)
                     Path { path in

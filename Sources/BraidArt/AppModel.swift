@@ -45,6 +45,22 @@ enum DimensionSelectionTarget:String,Identifiable {
     var id:String { rawValue }
 }
 
+private enum PictureInput: @unchecked Sendable {
+    case image(URL),frame(CGImage)
+    func prepare(settings:BraidCore.Settings) throws -> PixelImage {
+        switch self {
+        case .image(let url): return try ImageProcessor.prepare(url:url,settings:settings)
+        case .frame(let image): return try ImageProcessor.prepare(image:image,settings:settings)
+        }
+    }
+    func preparePalette(settings:BraidCore.Settings) throws -> PixelImage {
+        switch self {
+        case .image(let url): return try ImageProcessor.preparePalette(url:url,settings:settings)
+        case .frame(let image): return try ImageProcessor.preparePalette(image:image,settings:settings)
+        }
+    }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var settings:BraidCore.Settings = {
@@ -59,6 +75,22 @@ final class AppModel: ObservableObject {
         }
     }
     @Published var sourceImage: NSImage?
+    @Published private(set) var videoSource:VideoSource?
+    @Published private(set) var videoFrameTime=0.0
+    @Published private(set) var selectedFrameTime=0.0
+    @Published private(set) var selectingVideoFrame=false
+    @Published var videoFormat=VideoOutputFormat.mostCompatible
+    @Published var videoIncludeAudio=true { didSet { videoPlayback?.player.isMuted = !videoIncludeAudio } }
+    @Published private(set) var videoSegment:VideoSegment?
+    @Published private(set) var videoPlayback:VideoPlayback?
+    @Published private(set) var isPlayingVideo=false
+    private enum FrameAction { case none,weave,extract }
+    private var nextFrameAction=FrameAction.none
+    private var checkedFrameTime:Double?
+    private var videoFrame:CGImage?
+    private var frameSelectionID=0
+    private var preparedFrameID:Int?
+    private var checkedVideoSettings:BraidCore.Settings?
     @Published var hasCropSelection=false
     @Published var sourceName=""
     @Published var prepared: PixelImage?
@@ -71,7 +103,7 @@ final class AppModel: ObservableObject {
     var busy: Bool { activity != nil }
     // Routine previews and extraction must not dim every control in the editor.
     var blocksEditing: Bool { activity == .exclusive }
-    @Published var status=L("Choose a picture to begin.")
+    @Published var status=L("Choose an image or video to begin.")
     @Published var progress=0.0
     @Published var error: String?
     let solverURL=CBCRunner.discover()
@@ -106,7 +138,24 @@ final class AppModel: ObservableObject {
     private var exportSavePanel: NSSavePanel?
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? L("CPU fallback") }
     var tileData: TileData { TileData(settings:settings) }
-    var preparedIsCurrent: Bool { prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true }
+    var preparedIsCurrent: Bool {
+        prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true &&
+        (videoSource == nil || (!isPlayingVideo && !selectingVideoFrame && preparedFrameID==frameSelectionID))
+    }
+    var canWeavePicture:Bool {
+        !busy && solverURL != nil && (try? settings.validate()) != nil &&
+        (preparedIsCurrent || (videoSource != nil && !selectingVideoFrame))
+    }
+    var canWeaveVideo:Bool {
+        guard videoSource != nil,!busy,var checked=checkedVideoSettings,let segment=videoSegment,let time=checkedFrameTime,
+              time>=segment.start,time<segment.end else { return false }
+        checked.backgroundMinimumDistance=settings.backgroundMinimumDistance
+        return checked==settings && (try? VideoWeaver.validate(settings:settings)) != nil
+    }
+    private var pictureInput:PictureInput? {
+        if videoSource != nil { return videoFrame.map(PictureInput.frame) }
+        return sourceURL.map(PictureInput.image)
+    }
     var resultNeedsWeaving: Bool {
         guard var solved=project?.settings else { return false }
         // The threshold affects the next Extract, not an existing weave.
@@ -179,29 +228,96 @@ final class AppModel: ObservableObject {
     }
 
     func chooseImage() {
-        let panel=NSOpenPanel();panel.allowedContentTypes=[.image,.json,.braidArtProject];panel.allowsMultipleSelection=false
+        let panel=NSOpenPanel();panel.allowedContentTypes=[.image,.movie,.video,.json,.braidArtProject];panel.allowsMultipleSelection=false
         if panel.runModal() == .OK,let url=panel.url { open(url:url) }
     }
     func open(url: URL) {
         guard !busy else { return }
         task?.cancel();previewTask?.cancel();resultPreviewTask?.cancel();revision+=1
         if url.pathExtension.lowercased()=="braidart" || url.pathExtension.lowercased()=="json" { loadProject(url);return }
+        if VideoSource.isVideo(url) { openVideo(url);return }
         activity = .exclusive;status=L("Opening image…");let rev=revision
         task=Task {
             do {
                 let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.value
                 guard rev==revision else { return }
+                clearVideoSource()
                 sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.nsImage;resetCrop()
                 prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;activity=nil
                 prepare()
             } catch { fail(error) }
         }
     }
+    private func clearVideoSource() {
+        videoPlayback?.invalidate();videoPlayback=nil;videoSegment=nil;isPlayingVideo=false;nextFrameAction = .none;checkedFrameTime=nil
+        videoSource=nil;videoFrame=nil;videoFrameTime=0;selectedFrameTime=0;selectingVideoFrame=false
+        preparedFrameID=nil;checkedVideoSettings=nil;frameSelectionID+=1
+    }
+    private func openVideo(_ url:URL) {
+        activity = .exclusive;status=L("Opening video…")
+        task=Task { [self] in
+            do {
+                let source=try await VideoSource.open(url:url)
+                let frame=try await source.frame(at:0)
+                try Task.checkCancellation()
+                clearVideoSource();videoSource=source;videoFrame=frame.image;selectedFrameTime=frame.time
+                let segment=try VideoSegment(start:0,end:source.duration)
+                videoSegment=segment
+                let playback=VideoPlayback(source:source,segment:segment)
+                playback.player.isMuted = !videoIncludeAudio
+                playback.onPlaybackChanged={ [weak self] playing in
+                    guard let self else { return }
+                    self.isPlayingVideo=playing
+                    if playing { self.preparedFrameID=nil }
+                }
+                playback.onPaused={ [weak self] time in self?.selectVideoFrame(at:time) }
+                videoPlayback=playback
+                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=frame.image.nsImage;resetCrop()
+                prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;activity=nil
+                prepare()
+            } catch is CancellationError { activity=nil;status=L("Cancelled. Previous result retained.") }
+            catch { fail(error) }
+        }
+    }
+    func selectVideoFrame(at time:Double) {
+        nextFrameAction = .none
+        selectVideoFrame(at:time,after:.none)
+    }
+    private func selectVideoFrame(at time:Double,after action:FrameAction) {
+        guard let source=videoSource,time.isFinite,!blocksEditing,activity != .extractingPalette else { return }
+        let time=min(source.lastPreviewTime,(videoSegment?.end ?? source.duration)-0.000001,max(videoSegment?.start ?? 0,time))
+        videoPlayback?.seek(to:time)
+        nextFrameAction=action
+        task?.cancel();previewTask?.cancel();frameSelectionID+=1
+        let selection=frameSelectionID
+        videoFrameTime=time;selectingVideoFrame=true;activity = .preparingImage;status=L("Loading video frame…")
+        task=Task {
+            do {
+                try await Task.sleep(for:.milliseconds(100))
+                let frame=try await source.frame(at:time)
+                try Task.checkCancellation()
+                guard selection==frameSelectionID else { return }
+                videoFrame=frame.image;selectedFrameTime=frame.time;sourceImage=frame.image.nsImage
+                selectingVideoFrame=false;activity=nil;prepare()
+            } catch is CancellationError {} catch {
+                guard selection==frameSelectionID else { return }
+                selectingVideoFrame=false;fail(error)
+            }
+        }
+    }
+    func setVideoSegment(start:Double,end:Double) {
+        guard let source=videoSource,!blocksEditing,let segment=try? VideoSegment(start:start,end:end),
+              (try? segment.validate(sourceDuration:source.duration)) != nil else { return }
+        videoSegment=segment;videoPlayback?.setSegment(segment)
+        if !isPlayingVideo {
+            selectVideoFrame(at:min(end-0.000001,max(start,videoFrameTime)))
+        }
+    }
     func settingsChanged() {
         previewTask?.cancel();revision+=1
         refreshTiles()
         // Saved result keeps its own immutable settings; show it as a previous result.
-        guard sourceURL != nil, !preparedIsCurrent else { return }
+        guard sourceURL != nil,!isPlayingVideo,!preparedIsCurrent else { return }
         let rev=revision
         previewTask=Task {
             try? await Task.sleep(nanoseconds:250_000_000)
@@ -254,35 +370,42 @@ final class AppModel: ObservableObject {
         }
     }
     func prepare() {
-        guard let url=sourceURL,!busy else { return }
-        let snapshot=settings
+        guard let input=pictureInput,!busy,!selectingVideoFrame,!isPlayingVideo else { return }
+        let snapshot=settings,selection=frameSelectionID
         activity = .preparingImage;status=L("Preparing image…")
         task=Task {
             do {
-                let image=try await Task.detached { try ImageProcessor.prepare(url:url,settings:snapshot) }.value
-                guard !Task.isCancelled else { activity=nil;return }
+                let image=try await Task.detached { try input.prepare(settings:snapshot) }.valueWithCancellation()
+                guard !Task.isCancelled,selection==frameSelectionID else { return }
                 // Discard an obsolete preview before publishing any pixels.
                 guard snapshot.hasSameImagePreparation(as:settings) else { activity=nil;prepare();return }
-                prepared=image;preparedSettings=snapshot;preparedImage=try ImageProcessor.cgImage(image).nsImage
+                prepared=image;preparedSettings=snapshot;preparedFrameID=selection;preparedImage=try ImageProcessor.cgImage(image).nsImage
                 status=L("%@ × %@ tiles · %@ candidates per tile", String(describing: image.width), String(describing: image.height), String(describing: tileData.allTiles.count));activity=nil
-            } catch { fail(error) }
+                let action=nextFrameAction;nextFrameAction = .none
+                if action == .weave { solve() }
+                if action == .extract { extractPalette() }
+            } catch is CancellationError {} catch { if !Task.isCancelled { fail(error) } }
         }
     }
     func extractPalette() {
+        if isPlayingVideo,let playback=videoPlayback {
+            selectVideoFrame(at:playback.pause(notify:false),after:.extract);return
+        }
         guard let image=prepared,!busy else { return }
         activity = .extractingPalette;status=L("Finding strand and background colors…");let count=paletteCount,separation=paletteSeparation.minimumDistance
-        let includeAccents=paletteIncludeAccents,url=sourceURL,snapshot=settings,current=preparedIsCurrent
+        guard !selectingVideoFrame else { activity=nil;return }
+        let includeAccents=paletteIncludeAccents,input=pictureInput,snapshot=settings,current=preparedIsCurrent
         task=Task {
             do {
                 let extracted=try await Task.detached {
                     // A click immediately after an adjustment must use the latest
                     // crop/contrast/grayscale, even before its debounced preview.
                     var target=image
-                    if !current,let url { target=try ImageProcessor.prepare(url:url,settings:snapshot) }
+                    if !current,let input { target=try input.prepare(settings:snapshot) }
                     if snapshot.grayscale { target.pixels=target.pixels.map(BackgroundExtractor.neutral) }
                     let palette:[RGB]
                     if includeAccents {
-                        var detailed=try url.map { try ImageProcessor.preparePalette(url:$0,settings:snapshot) } ?? target
+                        var detailed=try input.map { try $0.preparePalette(settings:snapshot) } ?? target
                         if snapshot.grayscale { detailed.pixels=detailed.pixels.map(BackgroundExtractor.neutral) }
                         palette=PaletteExtractor.distinctColors(in:detailed,count:count,minimumDistance:separation)
                     } else {
@@ -301,7 +424,10 @@ final class AppModel: ObservableObject {
         }
     }
     func solve() {
-        guard !busy,let image=prepared,let executable=solverURL else { return }
+        if videoSource != nil,!busy,!preparedIsCurrent,let playback=videoPlayback {
+            selectVideoFrame(at:playback.pause(notify:false),after:.weave);return
+        }
+        guard !busy,preparedIsCurrent,let image=prepared,let executable=solverURL else { return }
         resultPreviewTask?.cancel()
         let snapshot=settings,name=sourceName
         activity = .exclusive;progress=0;selectedTab=2;status=L("Starting solver…")
@@ -322,6 +448,7 @@ final class AppModel: ObservableObject {
                 sceneSettings=SceneSettings(planeColor:data.background)
                 project=BraidProject(sourceName:name,settings:snapshot,sampledImage:image,tileData:data,result:result)
                 project?.sceneSettings=sceneSettings
+                if videoSource != nil { checkedVideoSettings=snapshot;checkedFrameTime=videoFrameTime }
                 resultImage=rendered.nsImage;zoom=1;activity=nil;progress=1
                 let quality=result.allPartitionsOptimal ? L("Every part proven optimal") : L("Feasible result · some parts reached the time or gap limit")
                 status=L("%@ · %@ s", String(describing: quality), String(describing: String(format:"%.1f",result.elapsedSeconds)))
@@ -333,6 +460,33 @@ final class AppModel: ObservableObject {
     func cancel() {
         if let exportProgress { exportProgress.cancelling=true;exportProgress.message=L("Cancelling export…") }
         task?.cancel();previewTask?.cancel()
+    }
+    func weaveVideo() {
+        guard selectedTab==2,canWeaveVideo else { return }
+        let panel=NSSavePanel();panel.allowedContentTypes=[.mpeg4Movie];panel.nameFieldStringValue="\(baseName)-braid.mp4"
+        panel.message=L("Choose where to save the woven video before processing begins.")
+        guard panel.runModal() == .OK,let url=panel.url else { return }
+        startVideoExport(to:url)
+    }
+    func startVideoExport(to url:URL) {
+        guard canWeaveVideo,let source=videoSource,let segment=videoSegment,let executable=solverURL else { return }
+        if let playback=videoPlayback { videoFrameTime=playback.pause(notify:false) }
+        let snapshot=settings,format=videoFormat,includeAudio=videoIncludeAudio
+        let export=ExportProgress(title:L("Weaving video"),filename:url.lastPathComponent,message:L("Preparing video…"))
+        activity = .exclusive;progress=0;status=L("Weaving video…");exportProgress=export
+        task=Task {
+            do {
+                let report=try await Task.detached(priority:.userInitiated) {
+                    try await VideoWeaver.write(source:source,settings:snapshot,format:format,includeAudio:includeAudio,segment:segment,to:url,executable:executable) { value,message in
+                        await MainActor.run { self.progress=value;self.status=message;export.progress=value;export.message=message }
+                    }
+                }.valueWithCancellation()
+                exportProgress=nil;activity=nil;progress=1
+                status=L("Saved %@ · %@ frames",url.lastPathComponent,String(report.frames))
+            } catch is CancellationError {
+                exportProgress=nil;activity=nil;progress=0;status=L("Video weaving cancelled. No incomplete video was saved.")
+            } catch { exportProgress=nil;fail(error) }
+        }
     }
     private func fail(_ err: Error) { activity=nil;error=err.localizedDescription;status=L("Could not complete the operation.") }
     func saveProject() {
@@ -363,7 +517,7 @@ final class AppModel: ObservableObject {
                 sceneSettings=loaded.sceneSettings ?? SceneSettings(planeColor:loaded.tileData.background)
                 cameraState=loaded.cameraState;pictureExportSize=loaded.pictureExportSize ?? .viewport
                 paletteIDs=loaded.settings.palette.map { _ in UUID() }
-                sourceURL=nil;sourceImage=nil;sourceName=loaded.sourceName;settings=loaded.settings
+                clearVideoSource();sourceURL=nil;sourceImage=nil;sourceName=loaded.sourceName;settings=loaded.settings
                 hasCropSelection=loaded.settings.crop != Crop()
                 prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).nsImage
                 project=loaded;resultImage=rendered.nsImage;refreshTiles();selectedTab=loaded.cameraState == nil ? 2 : 3;activity=nil
