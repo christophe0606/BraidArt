@@ -379,8 +379,11 @@ final class CurveTests:XCTestCase {
         let expected:[PictureExportSize:CGSize]=[
             .viewport:view.viewportPixelSize,.hd:CGSize(width:1280,height:720),.fullHD:CGSize(width:1920,height:1080),
             .ultraHD:CGSize(width:3840,height:2160),.instagramSquare:CGSize(width:1080,height:1080),
+            .quadHD:CGSize(width:2560,height:1440),.tikTokVideo:CGSize(width:1080,height:1920),.vertical4K:CGSize(width:2160,height:3840),
             .instagramPortrait:CGSize(width:1080,height:1350),.instagramTallPortrait:CGSize(width:1080,height:1440),
-            .instagramLandscape:CGSize(width:1080,height:566),.instagramStory:CGSize(width:1080,height:1920)]
+            .instagramLandscape:CGSize(width:1080,height:566),.instagramStory:CGSize(width:1080,height:1920),
+            .instagramReels:CGSize(width:1080,height:1920),.instagramFeedVideo:CGSize(width:1080,height:1350),
+            .instagramSquareVideo:CGSize(width:1080,height:1080),.instagramLandscapeVideo:CGSize(width:1920,height:1080)]
         let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:folder) }

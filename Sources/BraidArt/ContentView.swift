@@ -60,6 +60,9 @@ struct ContentView: View {
         }
         .onChange(of:model.sceneSettings) { _,_ in model.sceneSettingsChanged() }
         .onChange(of:model.settings) { _,_ in model.settingsChanged() }
+        .sheet(item:$model.dimensionManagerTarget) { target in
+            DimensionManagerView(model:model,target:target)
+        }
         .sheet(item:$model.exportProgress) { export in ExportProgressView(export:export,cancel:model.cancel) }
         .alert("BraidArt",isPresented:Binding(get:{model.error != nil},set:{if !$0 {model.error=nil}})) { Button(L("OK")) { model.error=nil } } message:{Text(model.error ?? "")}
     }
@@ -70,11 +73,8 @@ struct ContentView: View {
                 if let image=model.sourceImage {
                     Text(L("SOURCE & CROP")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     HStack(spacing:12) {
-                        Picker(L("Output dimensions"),selection:Binding(get:{model.settings.outputSize},set:{model.setOutputSize($0)})) {
-                            ForEach(PictureExportSize.outputSizes) { preset in
-                                Text(preset.title).tag(preset)
-                            }
-                        }.pickerStyle(.menu).frame(maxWidth:400)
+                        DimensionPicker(title:L("Output dimensions"),selection:Binding(get:{model.settings.outputSize},set:{model.setOutputSize($0)}),customDimensions:model.customDimensions,onManage:{model.dimensionManagerTarget = .output})
+                            .frame(maxWidth:430)
                         Spacer(minLength:0)
                         Button { model.scaleCrop(by:1/1.1) } label: { Image(systemName:"minus.magnifyingglass") }
                             .help(L("Scale crop down")).accessibilityLabel(L("Scale crop down")).disabled(!model.hasCropSelection)
@@ -167,9 +167,8 @@ struct ContentView: View {
                     Spacer()
                 }.padding(.horizontal,20).padding(.bottom,16)
                 HStack(spacing:16) {
-                    Picker(L("Picture dimensions"),selection:$model.pictureExportSize) {
-                        ForEach(PictureExportSize.allCases) { size in Text(size.title).tag(size) }
-                    }.pickerStyle(.menu).fixedSize()
+                    DimensionPicker(title:L("Picture dimensions"),selection:$model.pictureExportSize,customDimensions:model.customDimensions,includeViewport:true,onManage:{model.dimensionManagerTarget = .picture})
+                        .fixedSize()
                     Text(L("The red frame marks the exported area.")).font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength:0)
                 }.padding(.horizontal,20).padding(.bottom,16)

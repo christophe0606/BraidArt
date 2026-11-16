@@ -47,6 +47,17 @@ and NASA’s media usage guidelines.
    there is no separate PNG tile size setting. Fractional tile sizes are supported
    so the final PNG always has exactly the selected dimensions. 3D geometry still
    uses one unit per tile; 3D camera pictures retain their separate size picker.
+   The built-in list includes 720p, 1080p, 1440p, 4K UHD, 4K vertical, TikTok /
+   YouTube Shorts (1080 × 1920), and Instagram Reels, feed, square and landscape
+   video formats. These names describe canvas dimensions; PNG exports remain
+   still images.
+   Dimensions menus separate image, video and user-defined formats into groups.
+   Use **Manage Dimensions…** (the sliders button beside either dimensions picker)
+   to add a named size, or edit and delete your custom sizes. Built-in sizes are
+   locked. Custom sizes are saved across app launches and are available for both
+   woven PNGs and 3D pictures. Deleting a selected custom size selects 1080p Full HD.
+   Saved projects carry their selected dimensions, so they still open correctly
+   on another Mac without your custom-size library.
 2. Start with black and white strands over a gray background, or set a maximum
    of two to eight colors and select **Extract** to find representative colors
    in the cropped image. **Color separation** controls how similar shades are

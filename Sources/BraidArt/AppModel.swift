@@ -40,6 +40,11 @@ enum PaletteSeparation: String, CaseIterable, Identifiable {
     }
 }
 
+enum DimensionSelectionTarget:String,Identifiable {
+    case output,picture
+    var id:String { rawValue }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var settings:BraidCore.Settings = {
@@ -83,6 +88,10 @@ final class AppModel: ObservableObject {
     @Published var obliqueCamera=false
     @Published var exportProgress: ExportProgress?
     @Published var pictureExportSize:PictureExportSize = .viewport
+    @Published private(set) var customDimensions:[PictureExportSize]=[]
+    @Published var dimensionManagerTarget:DimensionSelectionTarget?
+    private let defaults:UserDefaults
+    private static let customDimensionsKey="customOutputDimensions"
     // Camera gestures do not need to invalidate SwiftUI on every mouse movement.
     private(set) var cameraState:CameraState?
     private weak var threeDView:BraidMetalView?
@@ -106,7 +115,44 @@ final class AppModel: ObservableObject {
         solved.outputSize=settings.outputSize
         return solved != settings
     }
-    init() { refreshTiles() }
+    init(defaults:UserDefaults = .standard) {
+        self.defaults=defaults
+        if let data=defaults.data(forKey:Self.customDimensionsKey),
+           let saved=try? JSONDecoder().decode([PictureExportSize].self,from:data) {
+            var ids=Set<String>()
+            customDimensions=saved.filter { $0.customSize != nil && ids.insert($0.id).inserted }
+        }
+        refreshTiles()
+    }
+
+    @discardableResult
+    func addCustomDimensions(name:String,width:Int,height:Int) throws -> PictureExportSize {
+        let preset=PictureExportSize.custom(try CustomPictureSize(name:name,width:width,height:height))
+        customDimensions.append(preset);saveCustomDimensions()
+        return preset
+    }
+    @discardableResult
+    func editCustomDimensions(_ preset:PictureExportSize,name:String,width:Int,height:Int) throws -> PictureExportSize {
+        guard let custom=preset.customSize,let index=customDimensions.firstIndex(where:{$0.id==preset.id}) else {
+            throw BraidError.invalid(L("Only custom dimensions can be edited or deleted."))
+        }
+        let replacement=PictureExportSize.custom(try CustomPictureSize(id:custom.id,name:name,width:width,height:height))
+        customDimensions[index]=replacement;saveCustomDimensions()
+        if settings.outputSize.id==preset.id { setOutputSize(replacement) }
+        if pictureExportSize.id==preset.id { pictureExportSize=replacement }
+        return replacement
+    }
+    @discardableResult
+    func deleteCustomDimensions(_ preset:PictureExportSize)->Bool {
+        guard preset.customSize != nil,customDimensions.contains(where:{$0.id==preset.id}) else { return false }
+        customDimensions.removeAll { $0.id==preset.id };saveCustomDimensions()
+        if settings.outputSize.id==preset.id { setOutputSize(.fullHD) }
+        if pictureExportSize.id==preset.id { pictureExportSize = .fullHD }
+        return true
+    }
+    private func saveCustomDimensions() {
+        if let data=try? JSONEncoder().encode(customDimensions) { defaults.set(data,forKey:Self.customDimensionsKey) }
+    }
 
     var paletteEntries: [PaletteEntry] {
         zip(paletteIDs,settings.palette).enumerated().map { index,pair in
@@ -361,7 +407,7 @@ final class AppModel: ObservableObject {
         let capture:BraidPictureCapture
         do { capture=try view.makePictureCapture() }
         catch { fail(error);return }
-        let options=PictureExportOptions(size:pictureExportSize,viewport:view.viewportPixelSize) { [weak self] size in
+        let options=PictureExportOptions(size:pictureExportSize,viewport:view.viewportPixelSize,customDimensions:customDimensions) { [weak self] size in
             self?.pictureExportSize=size
         }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]

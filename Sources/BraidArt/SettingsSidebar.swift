@@ -5,6 +5,7 @@ import BraidCore
 /// New preview pixels, status messages and solver progress do not rebuild it.
 struct SidebarState: Equatable {
     let settings: BraidCore.Settings
+    let customDimensions:[PictureExportSize]
     let palette: [PaletteEntry]
     let sourceName: String
     let hasSourceImage: Bool
@@ -19,6 +20,7 @@ struct SidebarState: Equatable {
 
     @MainActor init(model: AppModel) {
         settings=model.settings;palette=model.paletteEntries;sourceName=model.sourceName
+        customDimensions=model.customDimensions
         hasSourceImage=model.sourceImage != nil
         hasCropSelection=model.hasCropSelection
         preparedSize=model.prepared.map { CGSize(width:$0.width,height:$0.height) }
@@ -46,9 +48,7 @@ struct SettingsSidebar: View, Equatable {
                     Button(action:model.chooseImage) { Label(L("Open Image or Project…"),systemImage:"photo.on.rectangle") }.controlSize(.large).frame(maxWidth:.infinity)
                     Text(L("Or drop an image anywhere in this window.")).font(.caption).foregroundStyle(.secondary)
                     if !state.sourceName.isEmpty { Text(state.sourceName).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
-                    Picker(L("Output dimensions"),selection:Binding(get:{state.settings.outputSize},set:{model.setOutputSize($0)})) {
-                        ForEach(PictureExportSize.outputSizes) { size in Text(size.title).tag(size) }
-                    }
+                    DimensionPicker(title:L("Output dimensions"),selection:Binding(get:{state.settings.outputSize},set:{model.setOutputSize($0)}),customDimensions:state.customDimensions,onManage:{model.dimensionManagerTarget = .output})
                     Stepper(L("Image width: %@ tiles", String(describing: state.settings.columns)),value:binding(\.settings.columns),in:8...256,step:2).disabled(!state.hasSourceImage)
                     if let size=state.preparedSize { Text(L("%@ × %@ = %@ tiles", String(describing: Int(size.width)), String(describing: Int(size.height)), String(describing: Int(size.width*size.height)))).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
                     if let size=state.preparedSize {
