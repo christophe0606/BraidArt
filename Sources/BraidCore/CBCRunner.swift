@@ -21,6 +21,22 @@ public enum CBCRunner {
         try await solve(problem:problem,settings:settings,request:CBCRequest())
     }
 
+    static func solve(problem:BlockProblem,settings:Settings,execution:PartitionExecutionControl?,lease:UUID?) async throws -> String {
+        let request=try CBCRequest()
+        if let execution,let lease {
+            execution.attachCancellation(lease) { request.cancel() }
+            // No timer survives a paused partition boundary. These are actual
+            // CBC events, not an invented percentage for an unpredictable search.
+            let timer=DispatchSource.makeTimerSource(queue:.global(qos:.utility))
+            timer.schedule(deadline:.now()+1,repeating:1,leeway:.milliseconds(200))
+            timer.setEventHandler { execution.sampleNativeEvents(lease,count:request.eventCount) }
+            timer.resume()
+            defer { timer.cancel();execution.sampleNativeEvents(lease,count:request.eventCount) }
+            return try await solve(problem:problem,settings:settings,request:request)
+        }
+        return try await solve(problem:problem,settings:settings,request:request)
+    }
+
     static func solve(problem:BlockProblem,settings:Settings,request:CBCRequest) async throws -> String {
         try settings.validate();try Task.checkCancellation()
         return try await withTaskCancellationHandler {
@@ -46,7 +62,14 @@ public enum CBCRunner {
 
     private static func solveFiles(problem:BlockProblem,settings:Settings,request:CBCRequest) throws -> String {
         let temp=request.directory
+        #if os(iOS)
+        // CBC may create its result/log while the screen is locked. Keep those
+        // temporary files encrypted but accessible after the first device unlock.
+        try FileManager.default.createDirectory(at:temp,withIntermediateDirectories:true,
+            attributes:[.protectionKey:FileProtectionType.completeUntilFirstUserAuthentication])
+        #else
         try FileManager.default.createDirectory(at:temp,withIntermediateDirectories:true)
+        #endif
         defer { try? FileManager.default.removeItem(at:temp) }
         let input=temp.appendingPathComponent("partition.lp"),seed=temp.appendingPathComponent("seed.sol")
         let output=temp.appendingPathComponent("result.sol"),log=temp.appendingPathComponent("solver.log")

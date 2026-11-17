@@ -40,15 +40,24 @@ struct SettingsSidebar: View, Equatable {
         ScrollView {
             VStack(alignment:.leading,spacing:22) {
                 HStack(spacing:10) {
-                    Image(nsImage:AppIcon.image).resizable().interpolation(.low).frame(width:40,height:40).accessibilityHidden(true)
+                    Image(platformImage:AppIcon.image).resizable().interpolation(.low).frame(width:40,height:40).clipShape(RoundedRectangle(cornerRadius:8)).accessibilityHidden(true)
                     VStack(alignment:.leading,spacing:2) { Text(L("BraidArt")).font(.title2.bold());Text(L("IMAGE TO WOVEN TILES")).font(.system(size:9,weight:.semibold,design:.monospaced)).tracking(1.5).foregroundStyle(.secondary) }
                 }.padding(.bottom,6)
                 section("01", L("Picture")) {
                     Button(action:model.chooseImage) { Label(L("Open Image, Video or Project…"),systemImage:"photo.on.rectangle") }.controlSize(.large).frame(maxWidth:.infinity)
+                    #if os(macOS)
                     Text(L("Or drop an image or video anywhere in this window.")).font(.caption).foregroundStyle(.secondary)
+                    #else
+                    Text(L("Choose a picture or video from Photos or Files.")).font(.caption).foregroundStyle(.secondary)
+                    #endif
                     if !state.sourceName.isEmpty { Text(state.sourceName).font(.caption).foregroundStyle(.secondary).lineLimit(2) }
                     DimensionPicker(title:L("Output dimensions"),selection:Binding(get:{state.settings.outputSize},set:{model.setOutputSize($0)}),customDimensions:state.customDimensions,onManage:{model.dimensionManagerTarget = .output})
+                    #if os(iOS)
+                        .padding(.bottom,14)
+                        .accessibilityIdentifier("sidebarOutputDimensions")
+                    #endif
                     Stepper(L("Image width: %@ tiles", String(describing: state.settings.columns)),value:binding(\.settings.columns),in:8...256,step:2).disabled(!state.hasSourceImage)
+                        .accessibilityIdentifier("sidebarImageWidth")
                     if let size=state.preparedSize { Text(L("%@ × %@ = %@ tiles", String(describing: Int(size.width)), String(describing: Int(size.height)), String(describing: Int(size.width*size.height)))).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
                     if let size=state.preparedSize {
                         Text(String(format:L("Tile size: %.2f × %.2f px"),state.settings.outputPixelSize.width/size.width,state.settings.outputPixelSize.height/size.height))
@@ -64,6 +73,7 @@ struct SettingsSidebar: View, Equatable {
                         Text(L("This project contains the sampled image. Open the original picture to change the crop or resize.")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
+                Divider().padding(.vertical,2)
                 section("02", L("Tiles & palette")) {
                     ColorPicker(L("Background"),selection:colorBinding(\.background),supportsOpacity:false)
                     ForEach(state.palette) { entry in
@@ -110,6 +120,7 @@ struct SettingsSidebar: View, Equatable {
                         }.padding(.top,8)
                     }
                 }
+                Divider().padding(.vertical,2)
                 section("03", L("Partition solve")) {
                     Stepper(L("Part size: %@ × %@", String(describing: state.settings.partitionSize), String(describing: state.settings.partitionSize)),value:binding(\.settings.partitionSize),in:1...20)
                     Picker(L("Time per part"),selection:binding(\.settings.secondsPerPartition)) {
@@ -121,16 +132,27 @@ struct SettingsSidebar: View, Equatable {
                     Stepper(L("CPU threads: %@", String(describing: state.settings.threads)),value:binding(\.settings.threads),in:1...16)
                     Text(L("Parts preserve strand colors along their top and left neighbors. Smaller parts solve faster.")).font(.caption).foregroundStyle(.secondary)
                 }
+                Divider().padding(.vertical,2)
                 section("04", L("Save & export")) {
                     Text(L("%@ × %@ pixels · PNG",String(Int(state.settings.outputPixelSize.width)),String(Int(state.settings.outputPixelSize.height))))
                         .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                     Button(L("Save Project…"),action:model.saveProject).disabled(!state.hasProject)
+                    #if os(macOS)
                     Text(L("Choose File → Export for all export formats.")).font(.caption).foregroundStyle(.secondary)
+                    #else
+                    Text(L("Use the export button above to save pictures, videos, PDF and 3D objects.")).font(.caption).foregroundStyle(.secondary)
+                    #endif
                     Text(L("Data export includes JSON, Wolfram data and tile images for subsequent processing.")).font(.caption).foregroundStyle(.secondary)
                 }
             }.padding(22).disabled(state.blocksEditing)
-        }.frame(minWidth:290,idealWidth:320,maxWidth:370)
-            .background(Color(nsColor:.controlBackgroundColor))
+        }
+        #if os(macOS)
+        .frame(minWidth:290,idealWidth:320,maxWidth:370)
+        .background(Color(nsColor:.controlBackgroundColor))
+        #else
+        .frame(maxWidth:.infinity)
+        .background(Color(uiColor:.secondarySystemBackground))
+        #endif
     }
     private func binding<Value>(_ path: ReferenceWritableKeyPath<AppModel,Value>)->Binding<Value> {
         Binding(get:{model[keyPath:path]},set:{model[keyPath:path]=$0})

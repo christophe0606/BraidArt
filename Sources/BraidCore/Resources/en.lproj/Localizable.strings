@@ -414,3 +414,67 @@
 "Choose an image or video to begin." = "Choose an image or video to begin.";
 
 "Could not allocate the CBC solver." = "Could not allocate the CBC solver.";
+
+"Settings" = "Settings";
+
+"Photos" = "Photos";
+
+"Files" = "Files";
+
+"Save to" = "Save to";
+
+"Choose a picture or video from Photos or Files." = "Choose a picture or video from Photos or Files.";
+
+"Pinch to scale. Drag to move or resize the crop." = "Pinch to scale. Drag to move or resize the crop.";
+
+"One finger to rotate · Two fingers to pan · Pinch to zoom" = "One finger to rotate · Two fingers to pan · Pinch to zoom";
+
+"Use the export button above to save pictures, videos, PDF and 3D objects." = "Use the export button above to save pictures, videos, PDF and 3D objects.";
+
+"Saving to Photos…" = "Saving to Photos…";
+
+"Saved to Photos." = "Saved to Photos.";
+
+"Saved to Files." = "Saved to Files.";
+
+"Export cancelled." = "Export cancelled.";
+
+"Exporting…" = "Exporting…";
+
+"Cannot open the selected picture or video." = "Cannot open the selected picture or video.";
+
+"Allow BraidArt to add pictures and videos in Settings → Privacy & Security → Photos, or save to Files." = "Allow BraidArt to add pictures and videos in Settings → Privacy & Security → Photos, or save to Files.";
+
+"Pinch to zoom the woven image. Drag to move around when zoomed in." = "Pinch to zoom the woven image. Drag to move around when zoomed in.";
+
+"Save pictures and videos to Photos or Files. Save PDF, projects and 3D objects to Files." = "Save pictures and videos to Photos or Files. Save PDF, projects and 3D objects to Files.";
+
+"Licenses & notices" = "Licenses & notices";
+
+"Cannot read this notice." = "Cannot read this notice.";
+
+"Hide sidebar" = "Hide sidebar";
+
+"Show sidebar" = "Show sidebar";
+
+"Resize sidebar" = "Resize sidebar";
+
+"%@ points" = "%@ points";
+
+"Try different colors and levels of detail to find a look you like. Save your project to return to it later, or use the export button to keep and share your artwork as a picture or a 3D object." = "Try different colors and levels of detail to find a look you like. Save your project to return to it later, or use the export button to keep and share your artwork as a picture or a 3D object.";
+
+"Weaving image" = "Weaving image";
+
+"Preparing to weave…" = "Preparing to weave…";
+
+"Part %@ of %@" = "Part %@ of %@";
+
+"Finishing current partition" = "Finishing current partition";
+
+"Paused until you return to BraidArt." = "Paused until you return to BraidArt.";
+
+"Finishing the current partition before pausing…" = "Finishing the current partition before pausing…";
+
+"Weaving paused" = "Weaving paused";
+
+"Return to BraidArt to continue." = "Return to BraidArt to continue.";

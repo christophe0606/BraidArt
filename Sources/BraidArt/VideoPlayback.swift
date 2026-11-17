@@ -86,6 +86,7 @@ final class VideoPlayback:ObservableObject {
     }
 }
 
+#if os(macOS)
 struct VideoPreview: NSViewRepresentable {
     let player:AVPlayer
     func makeNSView(context:Context)->PlayerSurface { let view=PlayerSurface();view.playerLayer.player=player;return view }
@@ -99,3 +100,15 @@ struct VideoPreview: NSViewRepresentable {
         override func layout() { super.layout();playerLayer.frame=bounds }
     }
 }
+
+#else
+struct VideoPreview:UIViewRepresentable {
+    let player:AVPlayer
+    func makeUIView(context:Context)->PlayerSurface { let view=PlayerSurface();view.playerLayer.player=player;return view }
+    func updateUIView(_ view:PlayerSurface,context:Context) { view.playerLayer.player=player }
+    final class PlayerSurface:UIView {
+        override class var layerClass:AnyClass { AVPlayerLayer.self }
+        var playerLayer:AVPlayerLayer { layer as! AVPlayerLayer }
+    }
+}
+#endif

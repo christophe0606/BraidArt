@@ -1,3 +1,4 @@
+#if os(macOS)
 import AppKit
 
 /// Shared artwork for the Dock, sidebar, About, Help and Finder documents.
@@ -11,3 +12,5 @@ enum AppIcon {
         return NSImage(systemSymbolName:"circle.hexagongrid.fill",accessibilityDescription:"BraidArt") ?? NSImage(size:NSSize(width:128,height:128))
     }()
 }
+
+#endif

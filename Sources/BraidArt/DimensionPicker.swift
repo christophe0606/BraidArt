@@ -16,7 +16,19 @@ struct DimensionPicker:View {
         return choices
     }
     var body:some View {
-        HStack(spacing:8) {
+        #if os(iOS)
+        VStack(alignment:.leading,spacing:4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            HStack(spacing:8) {
+                dimensionMenu.labelsHidden().lineLimit(1).frame(maxWidth:.infinity,alignment:.leading)
+                manageButton
+            }
+        }.fixedSize(horizontal:false,vertical:true)
+        #else
+        HStack(spacing:8) { dimensionMenu;manageButton }
+        #endif
+    }
+    private var dimensionMenu:some View {
             Picker(title,selection:$selection) {
                 if includeViewport {
                     Text(PictureExportSize.viewport.title).tag(PictureExportSize.viewport)
@@ -36,11 +48,12 @@ struct DimensionPicker:View {
                     }
                 }
             }.pickerStyle(.menu)
-            if let onManage {
-                Button(action:onManage) { Image(systemName:"slider.horizontal.3") }
-                    .buttonStyle(.borderless).help(L("Manage Dimensions…"))
-                    .accessibilityLabel(L("Manage Dimensions…"))
-            }
+    }
+    @ViewBuilder private var manageButton:some View {
+        if let onManage {
+            Button(action:onManage) { Image(systemName:"slider.horizontal.3") }
+                .buttonStyle(.borderless).help(L("Manage Dimensions…"))
+                .accessibilityLabel(L("Manage Dimensions…"))
         }
     }
 }

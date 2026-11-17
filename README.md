@@ -1,11 +1,18 @@
-# BraidArt for macOS
+# BraidArt for macOS, iPhone and iPad
 
 A native SwiftUI app for the image-to-dark-tile pipeline in
 `TilingAndConstraints.nb` and the curve generation pipeline in `3DBraids.nb`.
 Requires macOS 14 or later. The locally built app targets Apple Silicon;
 building on an Intel Mac produces an Intel app and solver.
 
-## Run
+## iPhone and iPad
+
+The universal app requires iOS/iPadOS 26 or later. It uses a landscape workspace with a settings sidebar on iPad,
+and portrait/landscape tabs on iPhone. It supports touch controls for 2D/3D and
+Photos or Files for picture/video exports. PDF and 3D objects export through Files.
+See [iOS build and testing instructions](Docs/iOS.md).
+
+## Run on macOS
 
 Open **`dist/BraidArt.app`** in Finder after building. The app includes CBC and
 requires neither Mathematica nor Homebrew at runtime. This development build is
@@ -242,15 +249,11 @@ and practical limits. The original notebooks and JavaScript are untouched.
 Curve tracing, Bézier generation, vector PDF, Metal visualization and GLB export
 are implemented. Blender itself has not been launched or tested.
 
-## License
+## Third-party credits
 
-BraidArt's original code and project-owned materials are licensed under the
-[Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for project attribution
-and [Docs/Licensing.md](Docs/Licensing.md) for the licensing scope.
-
-Third-party components retain their respective licenses. In particular, the
-separate COIN-OR solver is distributed under its upstream licenses; the root
-Apache license does not relicense it.
+Third-party components retain their own licenses, author notices and source
+references. The application does not display or bundle an open-source license
+for BraidArt itself.
 
 Full license texts, author notices, exact upstream source URLs and archive
 checksums for all five COIN-OR components are in [Licenses/README.md](Licenses/README.md).
@@ -260,8 +263,8 @@ color-validation data. The app bundle includes the same license inventory.
 ## About and inspiration
 
 Choose **BraidArt → About BraidArt** for Christophe Favergeon's copyright,
-the project license, and included projects with their source links and license
-texts.
+included third-party projects with their source links and license texts, and
+the source/rights information for the help illustrations.
 
 The app icon uses exactly nine connected tiles in a 3 × 3 arrangement, with
 broad black and white strands on gray, rendered by BraidArt's own flat tile

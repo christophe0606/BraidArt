@@ -40,9 +40,10 @@ public enum VideoWeaver {
     }
     /// Decode and solve one frame at a time. Only the completed movie replaces
     /// the destination; a cancelled or failed run removes its temporary output.
-    public static func write(source:VideoSource,settings:Settings,format:VideoOutputFormat,includeAudio:Bool=true,segment requestedSegment:VideoSegment?=nil,to destination:URL,
+    public static func write(source:VideoSource,settings:Settings,format:VideoOutputFormat,includeAudio:Bool=true,segment requestedSegment:VideoSegment?=nil,to destination:URL,execution:PartitionExecutionControl?=nil,
                              progress:@escaping @Sendable (Double,String) async -> Void = {_,_ in}) async throws -> VideoWeaveReport {
         try validate(settings:settings);try Task.checkCancellation()
+        try await execution?.waitUntilForeground()
         let segment=try requestedSegment ?? VideoSegment(start:0,end:source.duration)
         try segment.validate(sourceDuration:source.duration)
         guard source.url.resolvingSymlinksInPath().standardizedFileURL != destination.resolvingSymlinksInPath().standardizedFileURL else {
@@ -89,23 +90,25 @@ public enum VideoWeaver {
         // Reader start/copy calls stay on their owning task. Cancelling a reader
         // concurrently with startReading can crash inside AVFoundation.
         func process() async throws -> VideoWeaveReport {
+            try await execution?.waitUntilForeground()
             guard writer.startWriting(),reader.startReading() else { throw writer.error ?? reader.error ?? BraidError.invalid(L("Cannot start video processing.")) }
             writer.startSession(atSourceTime:.zero)
-            async let audioWriting:Void=appendAudio(audio,writer:writer,segment:segment)
+            async let audioWriting:Void=appendAudio(audio,writer:writer,segment:segment,execution:execution)
             let context=CIContext(options:[.workingColorSpace:CGColorSpace(name:CGColorSpace.sRGB)!, .cacheIntermediates:false])
             var count=0
             func appendFrame(_ image:CIImage,at time:Double,until frameEnd:Double) async throws {
                 try Task.checkCancellation()
+                try await execution?.waitUntilForeground()
                 let sampled=try autoreleasepool { try ImageProcessor.prepare(image:image,settings:settings) }
                 let frameNumber=count+1
-                let (data,result)=try await PartitionSolver.solve(image:sampled,settings:settings) { fraction,message in
+                let (data,result)=try await PartitionSolver.solve(image:sampled,settings:settings,execution:execution) { fraction,message in
                     let start=max(segment.start,time)
                     let fractionOfMovie=(start-segment.start+fraction*max(0,frameEnd-start))/segment.duration
                     await progress(min(0.95,fractionOfMovie*0.95),L("Frame %@ · %@",String(frameNumber),message))
                 }
                 try Task.checkCancellation()
                 let rendered=try autoreleasepool { try TileRenderer.render(solution:result.solution,data:data,pixelSize:size) }
-                try await ready(input,writer:writer)
+                try await ready(input,writer:writer,execution:execution)
                 guard let pool=adaptor.pixelBufferPool else { throw BraidError.invalid(L("Cannot allocate a video frame.")) }
                 var pixelBuffer:CVPixelBuffer?
                 guard CVPixelBufferPoolCreatePixelBuffer(nil,pool,&pixelBuffer)==kCVReturnSuccess,let pixelBuffer else {
@@ -126,6 +129,7 @@ public enum VideoWeaver {
             }
             while let sample=current {
                 try Task.checkCancellation()
+                try await execution?.waitUntilForeground()
                 let next=output.copyNextSampleBuffer()
                 let time=CMSampleBufferGetPresentationTimeStamp(sample).seconds
                 if time<segment.end {
@@ -137,6 +141,7 @@ public enum VideoWeaver {
             }
             try Task.checkCancellation()
             guard reader.status == .completed,count>0 else { throw reader.error ?? BraidError.invalid(L("Cannot decode the source video.")) }
+            try await execution?.waitUntilForeground()
             input.markAsFinished()
             try await audioWriting
             await progress(0.98,L("Finishing video…"))
@@ -156,13 +161,14 @@ public enum VideoWeaver {
         return try await process()
     }
 
-    private static func ready(_ input:AVAssetWriterInput,writer:AVAssetWriter) async throws {
-        while !input.isReadyForMoreMediaData {
+    private static func ready(_ input:AVAssetWriterInput,writer:AVAssetWriter,execution:PartitionExecutionControl?) async throws {
+        while true {
             try Task.checkCancellation()
+            try await execution?.waitUntilForeground()
             guard writer.status == .writing else { throw writer.error ?? BraidError.invalid(L("The video encoder stopped.")) }
+            if input.isReadyForMoreMediaData { return }
             try await Task.sleep(for:.milliseconds(10))
         }
-        try Task.checkCancellation()
     }
     private struct AudioStream {
         let reader:AVAssetReader
@@ -184,13 +190,15 @@ public enum VideoWeaver {
             return Self(reader:reader,output:output,input:input)
         }
     }
-    private static func appendAudio(_ stream:AudioStream?,writer:AVAssetWriter,segment:VideoSegment) async throws {
+    private static func appendAudio(_ stream:AudioStream?,writer:AVAssetWriter,segment:VideoSegment,execution:PartitionExecutionControl?) async throws {
         guard let stream else { return }
+        try await execution?.waitUntilForeground()
         guard stream.reader.startReading() else { throw stream.reader.error ?? BraidError.invalid(L("Cannot preserve the source audio.")) }
         while let sample=stream.output.copyNextSampleBuffer() {
             try Task.checkCancellation()
+            try await execution?.waitUntilForeground()
             if CMSampleBufferGetPresentationTimeStamp(sample).seconds>=segment.end { break }
-            try await ready(stream.input,writer:writer)
+            try await ready(stream.input,writer:writer,execution:execution)
             let shifted=try shiftedAudio(sample,by:CMTime(seconds:segment.start,preferredTimescale:600_000))
             guard stream.input.append(shifted) else { throw writer.error ?? BraidError.invalid(L("Cannot preserve the source audio.")) }
         }

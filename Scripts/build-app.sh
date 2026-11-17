@@ -29,8 +29,9 @@ cp .build/solver-native/lib/libBraidCBC.dylib "$APP/Contents/Frameworks/"
 # Remove the CLI from bundles created by the earlier subprocess implementation.
 rm -f "$APP/Contents/Resources/Solver/bin/cbc"
 Scripts/package-licenses.sh "$APP/Contents/Resources/Solver"
-cp LICENSE NOTICE "$APP/Contents/Resources/"
-cp Docs/Licensing.md "$APP/Contents/Resources/"
+# Do not retain the former application-license files when rebuilding in place.
+rm -f "$APP/Contents/Resources/LICENSE" "$APP/Contents/Resources/Licensing.md"
+cp NOTICE "$APP/Contents/Resources/"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 for language in en fr; do
     mkdir -p "$APP/Contents/Resources/$language.lproj"

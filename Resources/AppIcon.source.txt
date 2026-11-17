@@ -11,3 +11,10 @@ Only cropping, bilinear resampling and the rounded-square alpha mask are applied
 Bilinear resampling avoids light fringes along black curves.
 Master: Resources/AppIcon.png (1024 × 1024, transparent margins).
 Regenerate: Scripts/generate-icon.sh
+
+iOS variant: iOS/Assets.xcassets/AppIcon.appiconset/AppIcon.png.
+The same nine validated tiles from Resources/IconPattern.braidart are rendered
+edge to edge at 1024 × 1024, as an opaque RGB image. The transparent 72-pixel
+macOS inset and rounded mask are omitted; iOS supplies the icon mask.
+Preview: iOS/Assets.xcassets/AppIconPreview.imageset/AppIcon.png.
+Regenerate: Scripts/generate-ios-icon.sh (Tools/make-ios-icon.swift).

@@ -35,7 +35,11 @@ struct ExportProgressView: View {
             }
         }
         .padding(24)
+        #if os(macOS)
         .frame(width:420)
+        #else
+        .frame(maxWidth:620)
+        #endif
         .interactiveDismissDisabled()
     }
 }

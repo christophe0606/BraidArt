@@ -1,5 +1,10 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+import Photos
+#endif
 import UniformTypeIdentifiers
 import Metal
 import BraidCore
@@ -7,11 +12,17 @@ import BraidCore
 extension RGB {
     var color: Color { Color(.sRGB,red:r,green:g,blue:b,opacity:1) }
     init(color: Color) {
+        #if os(macOS)
         let c=NSColor(color).usingColorSpace(.sRGB) ?? .black
         self.init(c.redComponent,c.greenComponent,c.blueComponent)
+        #else
+        var r:CGFloat=0,g:CGFloat=0,b:CGFloat=0,a:CGFloat=0
+        UIColor(color).getRed(&r,green:&g,blue:&b,alpha:&a)
+        self.init(Double(r),Double(g),Double(b))
+        #endif
     }
 }
-extension CGImage { var nsImage: NSImage { NSImage(cgImage:self,size:NSSize(width:width,height:height)) } }
+
 
 struct PaletteEntry: Identifiable, Equatable {
     let id: UUID
@@ -21,7 +32,7 @@ struct PaletteEntry: Identifiable, Equatable {
 
 struct TilePreview: Identifiable {
     let tile: Tile
-    let image: NSImage
+    let image: PlatformImage
     var id: Int { tile.id }
 }
 
@@ -74,7 +85,7 @@ final class AppModel: ObservableObject {
             }
         }
     }
-    @Published var sourceImage: NSImage?
+    @Published var sourceImage: PlatformImage?
     @Published private(set) var videoSource:VideoSource?
     @Published private(set) var videoFrameTime=0.0
     @Published private(set) var selectedFrameTime=0.0
@@ -94,8 +105,8 @@ final class AppModel: ObservableObject {
     @Published var hasCropSelection=false
     @Published var sourceName=""
     @Published var prepared: PixelImage?
-    @Published var preparedImage: NSImage?
-    @Published var resultImage: NSImage?
+    @Published var preparedImage: PlatformImage?
+    @Published var resultImage: PlatformImage?
     @Published var project: BraidProject?
     @Published private(set) var tilePreviews: [TilePreview]=[]
     enum Activity { case preparingImage, extractingPalette, exclusive }
@@ -127,6 +138,20 @@ final class AppModel: ObservableObject {
     private(set) var cameraState:CameraState?
     private weak var threeDView:BraidMetalView?
     private var sourceURL: URL?
+    #if os(iOS) && DEBUG
+    var backgroundWeavingTestValue:String {
+        guard ProcessInfo.processInfo.arguments.contains("--trace-background-weaving") else { return "" }
+        return "pausedPart=\(weavingLifecycle.testPausedPart) completed=\(weavingLifecycle.testCompletedPart) resumedPart=\(weavingLifecycle.testResumedPart) continued=\(weavingLifecycle.testUsedContinued)"
+    }
+    #endif
+    private var weavingState:PartitionExecutionControl.Snapshot?
+    private var weavingMessage=""
+    #if os(iOS)
+    private lazy var weavingLifecycle=MobileWeavingLifecycle { [weak self] state in
+        self?.weavingState=state
+        self?.refreshWeavingStatus()
+    }
+    #endif
     private var task: Task<Void,Never>?
     private var previewTask: Task<Void,Never>?
     private var resultPreviewTask: Task<Void,Never>?
@@ -134,7 +159,16 @@ final class AppModel: ObservableObject {
     private var revision=0
     private var cachedTileData: TileData?
     private var paletteIDs=BraidCore.Settings().palette.map { _ in UUID() }
+    #if os(macOS)
     private var exportSavePanel: NSSavePanel?
+    #else
+    @Published var showingImportChoice=false
+    @Published var showingFileImport=false
+    @Published var showingPhotoImport=false
+    @Published var mobileExport:MobileExportRequest?
+    @Published var exportedFile:MobileExportFile?
+    private var mobileDestination=MobileExportDestination.files
+    #endif
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? L("CPU fallback") }
     var tileData: TileData { TileData(settings:settings) }
     var preparedIsCurrent: Bool {
@@ -226,10 +260,12 @@ final class AppModel: ObservableObject {
         settings.palette=palette
     }
 
+    #if os(macOS)
     func chooseImage() {
         let panel=NSOpenPanel();panel.allowedContentTypes=[.image,.movie,.video,.json,.braidArtProject];panel.allowsMultipleSelection=false
         if panel.runModal() == .OK,let url=panel.url { open(url:url) }
     }
+    #endif
     func open(url: URL) {
         guard !busy else { return }
         task?.cancel();previewTask?.cancel();resultPreviewTask?.cancel();revision+=1
@@ -241,7 +277,7 @@ final class AppModel: ObservableObject {
                 let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.value
                 guard rev==revision else { return }
                 clearVideoSource()
-                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.nsImage;resetCrop()
+                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.platformImage;resetCrop()
                 prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;activity=nil
                 prepare()
             } catch { fail(error) }
@@ -271,7 +307,7 @@ final class AppModel: ObservableObject {
                 }
                 playback.onPaused={ [weak self] time in self?.selectVideoFrame(at:time) }
                 videoPlayback=playback
-                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=frame.image.nsImage;resetCrop()
+                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=frame.image.platformImage;resetCrop()
                 prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;activity=nil
                 prepare()
             } catch is CancellationError { activity=nil;status=L("Cancelled. Previous result retained.") }
@@ -296,7 +332,7 @@ final class AppModel: ObservableObject {
                 let frame=try await source.frame(at:time)
                 try Task.checkCancellation()
                 guard selection==frameSelectionID else { return }
-                videoFrame=frame.image;selectedFrameTime=frame.time;sourceImage=frame.image.nsImage
+                videoFrame=frame.image;selectedFrameTime=frame.time;sourceImage=frame.image.platformImage
                 selectingVideoFrame=false;activity=nil;prepare()
             } catch is CancellationError {} catch {
                 guard selection==frameSelectionID else { return }
@@ -354,7 +390,7 @@ final class AppModel: ObservableObject {
                     try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size)
                 }.valueWithCancellation()
                 try Task.checkCancellation()
-                resultImage=image.nsImage
+                resultImage=image.platformImage
             } catch is CancellationError {} catch { self.error=error.localizedDescription }
         }
     }
@@ -364,7 +400,7 @@ final class AppModel: ObservableObject {
         guard data != cachedTileData else { return }
         cachedTileData=data
         tilePreviews=data.allTiles.compactMap { tile in
-            guard let image=try? TileRenderer.tile(tile,data:data,size:64).nsImage else { return nil }
+            guard let image=try? TileRenderer.tile(tile,data:data,size:64).platformImage else { return nil }
             return TilePreview(tile:tile,image:image)
         }
     }
@@ -378,7 +414,7 @@ final class AppModel: ObservableObject {
                 guard !Task.isCancelled,selection==frameSelectionID else { return }
                 // Discard an obsolete preview before publishing any pixels.
                 guard snapshot.hasSameImagePreparation(as:settings) else { activity=nil;prepare();return }
-                prepared=image;preparedSettings=snapshot;preparedFrameID=selection;preparedImage=try ImageProcessor.cgImage(image).nsImage
+                prepared=image;preparedSettings=snapshot;preparedFrameID=selection;preparedImage=try ImageProcessor.cgImage(image).platformImage
                 status=L("%@ × %@ tiles · %@ candidates per tile", String(describing: image.width), String(describing: image.height), String(describing: tileData.allTiles.count));activity=nil
                 let action=nextFrameAction;nextFrameAction = .none
                 if action == .weave { solve() }
@@ -431,35 +467,66 @@ final class AppModel: ObservableObject {
         let snapshot=settings,name=sourceName
         activity = .exclusive;progress=0;selectedTab=2;status=L("Starting solver…")
         previewTask?.cancel()
+        let execution=beginWeaving(title:L("Weaving image"))
         task=Task {
+            var succeeded=false
+            defer { finishWeaving(execution,success:succeeded) }
             do {
                 let output=try await Task.detached(priority:.userInitiated) {
-                    try await PartitionSolver.solve(image:image,settings:snapshot) { p,message in
+                    try await PartitionSolver.solve(image:image,settings:snapshot,execution:execution) { p,message in
                         await self.update(p,message)
                     }
                 }.valueWithCancellation()
                 try Task.checkCancellation()
                 let result=output.1,data=output.0
                 let rendered=try await Task.detached{try TileRenderer.render(solution:result.solution,data:data,pixelSize:snapshot.outputPixelSize)}.value
+                try await execution?.waitUntilForeground()
                 let generated=try await Task.detached { try CurveGenerator.generate(solution:result.solution,data:data) }.value
+                try await execution?.waitUntilForeground()
                 let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
+                try await execution?.waitUntilForeground()
                 cameraState=nil;curves=generated;meshes=tubes;curveGeneration+=1
                 sceneSettings=SceneSettings(planeColor:data.background)
                 project=BraidProject(sourceName:name,settings:snapshot,sampledImage:image,tileData:data,result:result)
                 project?.sceneSettings=sceneSettings
                 if videoSource != nil { checkedVideoSettings=snapshot;checkedFrameTime=videoFrameTime }
-                resultImage=rendered.nsImage;zoom=1;activity=nil;progress=1
+                resultImage=rendered.platformImage;zoom=1;activity=nil;progress=1
                 let quality=result.allPartitionsOptimal ? L("Every part proven optimal") : L("Feasible result · some parts reached the time or gap limit")
                 status=L("%@ · %@ s", String(describing: quality), String(describing: String(format:"%.1f",result.elapsedSeconds)))
+                succeeded=true
             } catch is CancellationError { activity=nil;status=L("Cancelled. Previous result retained.") }
             catch { fail(error) }
         }
     }
-    private func update(_ p: Double,_ message: String) { progress=p;status=message }
+    private func update(_ p: Double,_ message: String) {
+        progress=p;weavingMessage=message
+        if weavingState == nil { status=message } else { refreshWeavingStatus() }
+    }
+    private func beginWeaving(title:String)->PartitionExecutionControl? {
+        weavingMessage=status
+        #if os(iOS)
+        return weavingLifecycle.start(title:title) { [weak self] in self?.cancel() }
+        #else
+        return nil
+        #endif
+    }
+    private func finishWeaving(_ execution:PartitionExecutionControl?,success:Bool) {
+        #if os(iOS)
+        if let execution { weavingLifecycle.finish(execution,success:success) }
+        #endif
+    }
+    private func refreshWeavingStatus() {
+        // Ending a job must retain its final success/cancellation/error message.
+        guard let state=weavingState else { return }
+        let message=state.isPaused ? L("Paused until you return to BraidArt.") : state.isBackground ? L("Finishing the current partition before pausing…") : weavingMessage
+        if status != message { status=message }
+        if let exportProgress,exportProgress.message != message,!exportProgress.cancelling { exportProgress.message=message }
+    }
     func cancel() {
         if let exportProgress { exportProgress.cancelling=true;exportProgress.message=L("Cancelling export…") }
         task?.cancel();previewTask?.cancel()
     }
+    #if os(macOS)
     func weaveVideo() {
         guard selectedTab==2,canWeaveVideo else { return }
         let panel=NSSavePanel();panel.allowedContentTypes=[.mpeg4Movie];panel.nameFieldStringValue="\(baseName)-braid.mp4"
@@ -467,27 +534,39 @@ final class AppModel: ObservableObject {
         guard panel.runModal() == .OK,let url=panel.url else { return }
         startVideoExport(to:url)
     }
+    #endif
     func startVideoExport(to url:URL) {
         guard canWeaveVideo,let source=videoSource,let segment=videoSegment else { return }
         if let playback=videoPlayback { videoFrameTime=playback.pause(notify:false) }
         let snapshot=settings,format=videoFormat,includeAudio=videoIncludeAudio
         let export=ExportProgress(title:L("Weaving video"),filename:url.lastPathComponent,message:L("Preparing video…"))
         activity = .exclusive;progress=0;status=L("Weaving video…");exportProgress=export
+        let execution=beginWeaving(title:L("Weaving video"))
         task=Task {
+            var succeeded=false
+            defer { finishWeaving(execution,success:succeeded) }
             do {
                 let report=try await Task.detached(priority:.userInitiated) {
-                    try await VideoWeaver.write(source:source,settings:snapshot,format:format,includeAudio:includeAudio,segment:segment,to:url) { value,message in
-                        await MainActor.run { self.progress=value;self.status=message;export.progress=value;export.message=message }
+                    try await VideoWeaver.write(source:source,settings:snapshot,format:format,includeAudio:includeAudio,segment:segment,to:url,execution:execution) { value,message in
+                        await MainActor.run {
+                            self.update(value,message)
+                            if self.weavingState == nil { export.message=message }
+                        }
                     }
                 }.valueWithCancellation()
                 exportProgress=nil;activity=nil;progress=1
                 status=L("Saved %@ · %@ frames",url.lastPathComponent,String(report.frames))
+                succeeded=true
+                #if os(iOS)
+                finishMobileExport(url)
+                #endif
             } catch is CancellationError {
                 exportProgress=nil;activity=nil;progress=0;status=L("Video weaving cancelled. No incomplete video was saved.")
             } catch { exportProgress=nil;fail(error) }
         }
     }
     private func fail(_ err: Error) { activity=nil;error=err.localizedDescription;status=L("Could not complete the operation.") }
+    #if os(macOS)
     func saveProject() {
         guard let project=projectForSaving,!busy else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName).braidart";panel.allowedContentTypes=[.braidArtProject];panel.isExtensionHidden=false
@@ -495,6 +574,7 @@ final class AppModel: ObservableObject {
             do { try project.save(to:url);status=L("Saved %@", String(describing: url.lastPathComponent)) } catch { fail(error) }
         }
     }
+    #endif
     var projectForSaving:BraidProject? {
         guard var saved=project else { return nil }
         // This is an extraction preference, so saving it does not replace the
@@ -518,12 +598,13 @@ final class AppModel: ObservableObject {
                 paletteIDs=loaded.settings.palette.map { _ in UUID() }
                 clearVideoSource();sourceURL=nil;sourceImage=nil;sourceName=loaded.sourceName;settings=loaded.settings
                 hasCropSelection=loaded.settings.crop != Crop()
-                prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).nsImage
-                project=loaded;resultImage=rendered.nsImage;refreshTiles();selectedTab=loaded.cameraState == nil ? 2 : 3;activity=nil
+                prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).platformImage
+                project=loaded;resultImage=rendered.platformImage;refreshTiles();selectedTab=loaded.cameraState == nil ? 2 : 3;activity=nil
                 status=L("Project restored · %@ × %@ tiles", String(describing: loaded.sampledImage.width), String(describing: loaded.sampledImage.height))
             } catch { fail(error) }
         }
     }
+    #if os(macOS)
     func exportPNG() {
         guard let project=project,!busy else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.png";panel.allowedContentTypes=[.png]
@@ -536,6 +617,8 @@ final class AppModel: ObservableObject {
             } catch { fail(error) }
         }
     }
+    #endif
+    #if os(macOS)
     func exportData() {
         guard let project=projectForSaving,!busy else { return }
         let panel=NSOpenPanel();panel.canChooseDirectories=true;panel.canChooseFiles=false;panel.canCreateDirectories=true
@@ -551,10 +634,12 @@ final class AppModel: ObservableObject {
             } catch { fail(error) }
         }
     }
+    #endif
     func sceneSettingsChanged() { project?.sceneSettings=sceneSettings }
     func resetCamera(oblique:Bool) { obliqueCamera=oblique;cameraReset+=1 }
     func cameraChanged(_ state:CameraState) { cameraState=state }
     func register3DView(_ view:BraidMetalView) { threeDView=view }
+    #if os(macOS)
     func export3DPicture() {
         guard !busy,exportSavePanel == nil,selectedTab==3,curves != nil,let view=threeDView,let window=view.window else { return }
         let capture:BraidPictureCapture
@@ -576,6 +661,7 @@ final class AppModel: ObservableObject {
             self.startPictureExport(capture,size:options.pixelSize,to:url)
         }
     }
+    #endif
     private func startPictureExport(_ capture:BraidPictureCapture,size:CGSize,to url:URL) {
         let export=ExportProgress(title:L("Exporting 3D Picture"),filename:url.lastPathComponent,message:L("Rendering 3D picture…"))
         activity = .exclusive;progress=0;status=L("Exporting 3D picture…");exportProgress=export
@@ -596,6 +682,9 @@ final class AppModel: ObservableObject {
                     try Data(contentsOf:temporary).write(to:url,options:.atomic)
                 }.valueWithCancellation()
                 exportProgress=nil;activity=nil;progress=1;status=L("Saved %@", String(describing: url.lastPathComponent))
+                #if os(iOS)
+                finishMobileExport(url)
+                #endif
             } catch is CancellationError {
                 exportProgress=nil;activity=nil;progress=0;status=L("Picture export cancelled.")
             } catch {
@@ -603,6 +692,7 @@ final class AppModel: ObservableObject {
             }
         }
     }
+    #if os(macOS)
     func exportPDF() {
         guard curves != nil,!busy,exportSavePanel == nil else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.pdf";panel.allowedContentTypes=[.pdf]
@@ -616,6 +706,7 @@ final class AppModel: ObservableObject {
         if let window=NSApp.keyWindow { panel.beginSheetModal(for:window,completionHandler:completion) }
         else { panel.begin(completionHandler:completion) }
     }
+    #endif
     private func startPDFExport(_ curves:BraidCurves,to url:URL) {
         let export=ExportProgress(title:L("Exporting PDF"),filename:url.lastPathComponent,message:L("Preparing vector PDF…"))
         activity = .exclusive;progress=0;status=L("Exporting vector PDF…");exportProgress=export
@@ -630,6 +721,9 @@ final class AppModel: ObservableObject {
                     }
                 }.valueWithCancellation()
                 exportProgress=nil;activity=nil;progress=1;status=L("Saved %@", String(describing: url.lastPathComponent))
+                #if os(iOS)
+                finishMobileExport(url)
+                #endif
             } catch is CancellationError {
                 exportProgress=nil;activity=nil;progress=0;status=L("PDF export cancelled.")
             } catch {
@@ -637,6 +731,7 @@ final class AppModel: ObservableObject {
             }
         }
     }
+    #if os(macOS)
     func exportGLB() {
         guard let curves,!busy else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.glb";panel.allowedContentTypes=[UTType(filenameExtension:"glb") ?? .data]
@@ -644,6 +739,8 @@ final class AppModel: ObservableObject {
         let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
         runExport(L("Exporting colored 3D object…"),success:L("Saved %@", String(describing: url.lastPathComponent))) { try GLBExporter.write(meshes:all,to:url) }
     }
+    #endif
+    #if os(macOS)
     func exportUSDZ() {
         guard let curves,!busy,exportSavePanel == nil else { return }
         let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
@@ -660,6 +757,7 @@ final class AppModel: ObservableObject {
         if let window=NSApp.keyWindow { panel.beginSheetModal(for:window,completionHandler:completion) }
         else { panel.begin(completionHandler:completion) }
     }
+    #endif
     private func startUSDZExport(_ meshes:[TubeMesh],to url:URL) {
         let export=ExportProgress(title:L("Exporting USDZ"),filename:url.lastPathComponent,message:L("Preparing USDZ geometry…"))
         activity = .exclusive;progress=0;status=L("Exporting USDZ 3D object…");exportProgress=export
@@ -674,6 +772,9 @@ final class AppModel: ObservableObject {
                     }
                 }.valueWithCancellation()
                 exportProgress=nil;activity=nil;progress=1;status=L("Saved %@", String(describing: url.lastPathComponent))
+                #if os(iOS)
+                finishMobileExport(url)
+                #endif
             } catch is CancellationError {
                 exportProgress=nil;activity=nil;progress=0;status=L("USDZ export cancelled.")
             } catch {
@@ -696,3 +797,117 @@ extension Task where Failure == Error {
         try await withTaskCancellationHandler { try await value } onCancel: { cancel() }
     }
 }
+
+#if os(iOS)
+extension AppModel {
+    func chooseImage() { showingImportChoice=true }
+    func importMobileFile(_ url:URL) {
+        let access=url.startAccessingSecurityScopedResource()
+        defer { if access { url.stopAccessingSecurityScopedResource() } }
+        do {
+            let folder=FileManager.default.temporaryDirectory.appendingPathComponent("BraidImport-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+            let copy=folder.appendingPathComponent(url.lastPathComponent)
+            try FileManager.default.copyItem(at:url,to:copy)
+            open(url:copy)
+        } catch { fail(error) }
+    }
+    private func requestMobileExport(_ name:String,photos:Bool=false,operation:@escaping(URL)->Void) {
+        guard !busy else { return }
+        let start:(MobileExportDestination)->Void = { [weak self] destination in
+            guard let self else { return }
+            self.mobileExport=nil;self.mobileDestination=destination
+            do {
+                let folder=FileManager.default.temporaryDirectory.appendingPathComponent("BraidExport-\(UUID().uuidString)")
+                try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+                operation(folder.appendingPathComponent(name))
+            } catch { self.fail(error) }
+        }
+        if photos { mobileExport=MobileExportRequest(name:name,allowsPhotos:true,start:start) }
+        else { start(.files) }
+    }
+    private func finishMobileExport(_ url:URL) {
+        guard mobileDestination == .photos else { exportedFile=MobileExportFile(url:url);return }
+        let isVideo=VideoSource.isVideo(url)
+        activity = .exclusive;status=L("Saving to Photos…")
+        task=Task {
+            do {
+                let permission=await PHPhotoLibrary.requestAuthorization(for:.addOnly)
+                guard permission == .authorized || permission == .limited else {
+                    throw BraidError.invalid(L("Allow BraidArt to add pictures and videos in Settings → Privacy & Security → Photos, or save to Files."))
+                }
+                try await PHPhotoLibrary.shared().performChanges {
+                    if isVideo { PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL:url) }
+                    else { PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL:url) }
+                }
+                activity=nil;status=L("Saved to Photos.")
+                try? FileManager.default.removeItem(at:url.deletingLastPathComponent())
+            } catch {
+                fail(error)
+                // Keep the completed export available through Files if Photos is denied.
+                exportedFile=MobileExportFile(url:url)
+            }
+        }
+    }
+    func finishFileExport(_ saved:Bool) {
+        if let file=exportedFile { try? FileManager.default.removeItem(at:file.url.deletingLastPathComponent()) }
+        exportedFile=nil
+        status=saved ? L("Saved to Files.") : L("Export cancelled.")
+    }
+    func saveProject() {
+        guard let project=projectForSaving else { return }
+        requestMobileExport("\(baseName).braidart") { url in
+            do { try project.save(to:url);self.finishMobileExport(url) } catch { self.fail(error) }
+        }
+    }
+    func exportPNG() {
+        guard let project else { return }
+        let size=settings.outputPixelSize
+        requestMobileExport("\(baseName)-braid.png",photos:true) { url in
+            self.mobileRunExport(url) {
+                let cg=try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size)
+                try ImageProcessor.writePNG(cg,to:url)
+            }
+        }
+    }
+    func weaveVideo() {
+        guard canWeaveVideo else { return }
+        requestMobileExport("\(baseName)-braid.mp4",photos:true) { self.startVideoExport(to:$0) }
+    }
+    func export3DPicture() {
+        guard !busy,selectedTab==3,let view=threeDView else { return }
+        do {
+            let capture=try view.makePictureCapture()
+            let size=pictureExportSize.pixelSize(viewport:view.viewportPixelSize)
+            requestMobileExport("\(baseName)-3d.png",photos:true) { self.startPictureExport(capture,size:size,to:$0) }
+        } catch { fail(error) }
+    }
+    func exportPDF() {
+        guard let curves else { return }
+        requestMobileExport("\(baseName)-braid.pdf") { self.startPDFExport(curves,to:$0) }
+    }
+    func exportGLB() {
+        guard let curves else { return }
+        let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
+        requestMobileExport("\(baseName)-braid.glb") { url in self.mobileRunExport(url) { try GLBExporter.write(meshes:all,to:url) } }
+    }
+    func exportUSDZ() {
+        guard let curves else { return }
+        let all=meshes+[TubeMesher.plane(curves,settings:sceneSettings)]
+        requestMobileExport("\(baseName)-braid.usdz") { self.startUSDZExport(all,to:$0) }
+    }
+    func exportData() {
+        guard let project=projectForSaving else { return }
+        requestMobileExport("\(baseName)-braid-data") { url in self.mobileRunExport(url) { try ProjectExporter.export(project,to:url) } }
+    }
+    private func mobileRunExport(_ url:URL,operation:@escaping @Sendable()throws->Void) {
+        activity = .exclusive;status=L("Exporting…")
+        task=Task {
+            do {
+                try await Task.detached(priority:.userInitiated) { try operation() }.valueWithCancellation()
+                activity=nil;finishMobileExport(url)
+            } catch { fail(error) }
+        }
+    }
+}
+#endif

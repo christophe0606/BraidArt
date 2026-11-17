@@ -1,33 +1,23 @@
-BraidArt
-Copyright 2026 Christophe Favergeon
-Project origin: https://github.com/christophe0606/BraidArt
+Third-party notices for BraidArt
 
-BraidArt's original code and project-owned materials are licensed under the
-Apache License, Version 2.0. See LICENSE for the complete license text.
-Separately identified third-party components, notices and reference materials
-retain their respective licenses, copyrights and attribution requirements.
-
-This distribution includes the unmodified COIN-OR CBC solver in the shared
-library libBraidCBC.dylib, called within the application process. It incorporates CBC 2.10.13, CLP 1.17.11, CoinUtils 2.11.12,
-Osi 0.108.11 and Cgl 0.60.9. These components are not relicensed under Apache 2.0.
-Their upstream releases include EPL 2.0 top-level licenses and EPL 1.0 library
-licenses, retained along with author notices and embedded-code notices in
-Licenses/. Each component's ORIGIN.md gives its exact release, unmodified source
-archive URL and checksum. Licenses/README.md provides the full inventory.
-The original Apache-2.0 library bridge uses public interfaces without modifying
-upstream implementation files. CBC_CHANGES/README.md records upstream-edit policy.
+This distribution includes unmodified COIN-OR CBC 2.10.13, CLP 1.17.11,
+CoinUtils 2.11.12, Osi 0.108.11 and Cgl 0.60.9. Their upstream releases include
+EPL 2.0 top-level licenses and EPL 1.0 library licenses. Both originals, author
+notices and embedded-code notices are preserved in Solver/licenses/ in the app.
+Each component's ORIGIN.md gives its exact release, source archive URL and
+checksum. Solver/licenses/README.md provides the full inventory and source links.
 
 Numerical CIEDE2000 validation data is attributed to Gaurav Sharma, Wencheng Wu
-and Edul N. Dalal; see Licenses/README.md for the original data URL and citation.
+and Edul N. Dalal; the inventory records the original data URL and citation.
 
 The Help example photograph depicts Eileen Collins and is credited to NASA,
-via scikit-image. The scikit-image record identifies it as public domain, with
-no known copyright restrictions:
+via scikit-image. The image record identifies it as public domain, with no known
+copyright restrictions:
 https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut
 Original photograph: https://flic.kr/p/r9qvLn
 NASA media usage guidelines:
 https://www.nasa.gov/nasa-brand-center/images-and-media/
 The cropped portrait, woven picture and 3D artwork are BraidArt adaptations.
 
-In the macOS app bundle, this NOTICE and LICENSE are in Contents/Resources/.
-Third-party notices and source URLs are in Contents/Resources/Solver/licenses/.
+Third-party components and contents retain their respective licenses, copyrights
+and attribution requirements. CBC_CHANGES/README.md records upstream-edit policy.

@@ -1,10 +1,14 @@
 import SwiftUI
+#if os(macOS)
 import AppKit
+#else
+import UIKit
+#endif
 import BraidCore
 import AVFoundation
 
 struct CropEditor: View {
-    let image: NSImage
+    let image: PlatformImage
     @Binding var crop: Crop
     @Binding var hasSelection: Bool
     let aspectRatio: Double?
@@ -27,7 +31,7 @@ struct CropEditor: View {
             let selection=draft ?? (hasSelection ? crop : nil)
             ZStack(alignment:.topLeading) {
                 Color.black.opacity(0.2)
-                Image(nsImage:image).resizable().frame(width:fitted.width,height:fitted.height)
+                Image(platformImage:image).resizable().frame(width:fitted.width,height:fitted.height)
                     .offset(x:fitted.minX,y:fitted.minY)
                 if let player {
                     VideoPreview(player:player).frame(width:fitted.width,height:fitted.height)
@@ -61,7 +65,9 @@ struct CropEditor: View {
                                 drag=CropDrag(operation:.resize(crop,handle))
                             } else if selectedRect.contains(value.startLocation) {
                                 drag=CropDrag(operation:.move(crop))
+                                #if os(macOS)
                                 NSCursor.closedHand.set()
+                                #endif
                             } else {
                                 drag=CropDrag(operation:.draw(start))
                             }
@@ -76,12 +82,17 @@ struct CropEditor: View {
                     case .resize(let original,let handle): draft=CropGeometry.resized(original,handle:handle,by:translation,aspectRatio:aspectRatio)
                     case nil: break
                     }
-                }.onEnded { _ in commit();drag=nil;NSCursor.arrow.set() })
+                }.onEnded { _ in commit();drag=nil
+                    #if os(macOS)
+                    NSCursor.arrow.set()
+                    #endif
+                })
                 .simultaneousGesture(MagnificationGesture().onChanged { value in
                     guard hasSelection,drag == nil else { return }
                     if scaleStart == nil { scaleStart=crop }
                     if let original=scaleStart { draft=CropGeometry.scaled(original,by:value) }
                 }.onEnded { _ in commit();scaleStart=nil })
+                #if os(macOS)
                 .onContinuousHover { phase in
                     switch phase {
                     case .active(let location):
@@ -101,10 +112,13 @@ struct CropEditor: View {
                     case .ended: NSCursor.arrow.set()
                     }
                 }
+                #endif
         }
         .clipShape(RoundedRectangle(cornerRadius:12))
         .focusable().focused($focused).focusEffectDisabled()
+        #if os(macOS)
         .onDeleteCommand { if hasSelection { onDelete() } }
+        #endif
         .onChange(of:hasSelection) { _,_ in draft=nil;drag=nil;scaleStart=nil }
         .onChange(of:crop) { _,_ in draft=nil;drag=nil;scaleStart=nil }
         .accessibilityLabel(L("Crop editor"))

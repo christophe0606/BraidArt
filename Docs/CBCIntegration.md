@@ -68,7 +68,7 @@ would require a separate process, which is outside this architecture.
 ## Upstream source and licensing
 
 No upstream CBC, CLP, Cgl, Osi or CoinUtils implementation file is modified.
-The bridge and event subclasses are original Apache-2.0 application code using
+The bridge and event subclasses are original application code using
 public APIs. Upstream components keep their own licenses; see `Docs/Licensing.md`
 and `Licenses/README.md` for notices and exact source archives.
 

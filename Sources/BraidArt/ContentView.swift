@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import UniformTypeIdentifiers
 import BraidCore
@@ -239,3 +240,5 @@ struct ContentView: View {
         }.padding(30)
     }
 }
+
+#endif

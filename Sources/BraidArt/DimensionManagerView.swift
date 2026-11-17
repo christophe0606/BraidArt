@@ -16,6 +16,13 @@ struct DimensionManagerView:View {
         return (try? CustomPictureSize(name:name,width:w,height:h)) != nil
     }
     var body:some View {
+        #if os(iOS)
+        ScrollView { form }
+        #else
+        form
+        #endif
+    }
+    private var form:some View {
         VStack(alignment:.leading,spacing:16) {
             Text(L("Manage Dimensions…")).font(.title2.bold())
             Text(L("Built-in dimensions are fixed. Create your own named sizes in pixels."))
@@ -68,7 +75,12 @@ struct DimensionManagerView:View {
                 Button(editing == nil ? L("Add dimensions") : L("Save changes"),action:save)
                     .buttonStyle(.borderedProminent).disabled(!valid)
             }
-        }.padding(24).frame(width:620)
+        }.padding(24)
+        #if os(macOS)
+        .frame(width:620)
+        #else
+        .frame(maxWidth:620)
+        #endif
     }
     private func lockedRows(_ sizes:[PictureExportSize])->some View {
         ForEach(sizes) { size in

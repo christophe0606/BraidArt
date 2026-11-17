@@ -1,4 +1,4 @@
-// Copyright 2026 Christophe Favergeon. Apache-2.0.
+// Copyright 2026 Christophe Favergeon. All rights reserved.
 // Uses the public COIN-OR interfaces; upstream sources remain unmodified.
 #include "../Sources/CBCLibrary/BraidCBC.h"
 #include "CbcSolver.hpp"

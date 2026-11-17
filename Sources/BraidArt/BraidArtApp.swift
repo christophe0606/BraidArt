@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import AppKit
 import BraidCore
@@ -44,16 +45,6 @@ struct BraidArtApp: App {
     }
 }
 
-@MainActor
-enum FirstLaunchHelp {
-    static let preferenceKey="hasShownFirstLaunchHelp"
-
-    static func showIfNeeded(defaults:UserDefaults = .standard,showHelp:()->Void) {
-        guard !defaults.bool(forKey:preferenceKey) else { return }
-        defaults.set(true,forKey:preferenceKey)
-        showHelp()
-    }
-}
 
 struct HelpMenuCommands: Commands {
     let showHelp:()->Void
@@ -151,3 +142,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication)->Bool { true }
 }
+
+#endif

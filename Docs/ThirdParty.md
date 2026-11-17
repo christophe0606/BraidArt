@@ -1,13 +1,12 @@
 # COIN-OR solver
 
-BraidArt's original application code is licensed under Apache 2.0. The solver
-components below retain their respective upstream licenses. See
-[licensing scope](Licensing.md) in this repository and the root LICENSE/NOTICE.
+The components below retain their upstream licenses, author notices and source
+references. See the [third-party inventory](../Licenses/README.md).
 
 BraidArt bundles unmodified COIN-OR source releases compiled with Apple clang,
-static COIN-OR libraries incorporated into libBraidCBC.dylib and system
-compression/C++ libraries. The app dynamically links this library and calls CBC
-in its own process; it does not ship or launch the standalone CBC executable.
+static COIN-OR libraries incorporated into the macOS solver library and the iOS
+framework, plus system compression/C++ libraries. CBC runs within the app's own
+process; the standalone CBC executable is not shipped.
 No Homebrew runtime is required. Full license texts, author notices and origin URLs are checked into
 [`Licenses/`](../Licenses/README.md) and shipped with the solver library. Each
 project directory includes links to its exact release and source archive.
@@ -39,6 +38,7 @@ CBC adds branch-and-cut for the notebook's integer tile variables and uses CLP
 for its continuous relaxations. This does not claim Mathematica uses the same
 CBC version or search settings.
 
-No upstream implementation files are modified. The original Apache-2.0 bridge
-is in `Native/CBCBridge.cpp`. `CBC_CHANGES/README.md`, included with the solver
-notices, describes how any future upstream edits must be recorded and shared.
+No upstream implementation files are modified. `CBC_CHANGES/README.md`, included
+with the solver notices, describes how any future upstream edits must be recorded
+and shared. Image attribution and original source links are included in
+`Licenses/README.md` and in the app's third-party credits.

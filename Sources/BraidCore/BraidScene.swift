@@ -1,4 +1,12 @@
+#if os(macOS)
 import AppKit
+private typealias SceneColor = NSColor
+private typealias SceneScalar = CGFloat
+#else
+import UIKit
+private typealias SceneColor = UIColor
+private typealias SceneScalar = Float
+#endif
 import SceneKit
 import Metal
 
@@ -10,18 +18,18 @@ public enum BraidScene {
         let element=SCNGeometryElement(indices:mesh.indices,primitiveType:.triangles)
         let geometry=SCNGeometry(sources:[SCNGeometrySource(vertices:vertices),SCNGeometrySource(normals:normals)],elements:[element])
         let material=SCNMaterial();material.lightingModel = .physicallyBased
-        material.diffuse.contents=NSColor(srgbRed:mesh.color.r,green:mesh.color.g,blue:mesh.color.b,alpha:1)
+        material.diffuse.contents=SceneColor(red:mesh.color.r,green:mesh.color.g,blue:mesh.color.b,alpha:1)
         material.metalness.contents=0.0;material.roughness.contents=mesh.name=="Backing plane" ? 0.65 : 0.23
         material.isDoubleSided=true;geometry.materials=[material]
         return geometry
     }
     public static func make(_ braid:BraidCurves, meshes:[TubeMesh], settings:SceneSettings) -> SCNScene {
-        let scene=SCNScene();scene.background.contents=NSColor(calibratedWhite:0.10,alpha:1)
+        let scene=SCNScene();scene.background.contents=SceneColor(white:0.10,alpha:1)
         for mesh in meshes {
             let node=SCNNode(geometry:geometry(mesh));node.name=mesh.name;scene.rootNode.addChildNode(node)
         }
         let plane=SCNNode(geometry:geometry(TubeMesher.plane(braid,settings:settings)));plane.name="Backing plane";scene.rootNode.addChildNode(plane)
-        let ambient=SCNNode();ambient.light=SCNLight();ambient.light!.type = .ambient;ambient.light!.intensity=450;ambient.light!.color=NSColor.white;scene.rootNode.addChildNode(ambient)
+        let ambient=SCNNode();ambient.light=SCNLight();ambient.light!.type = .ambient;ambient.light!.intensity=450;ambient.light!.color=SceneColor.white;scene.rootNode.addChildNode(ambient)
         let key=SCNNode();key.light=SCNLight();key.light!.type = .directional;key.light!.intensity=1600
         key.eulerAngles=SCNVector3(-0.45,-0.4,0);key.light!.castsShadow=true
         key.light!.shadowMode = .deferred;key.light!.shadowRadius=3;key.light!.shadowSampleCount=16
@@ -43,8 +51,19 @@ public final class BraidMetalView: SCNView {
     public private(set) var orbitPitch:Float=0
     public private(set) var cameraDistance:Float=10
     private var fitDistance:Float=10
+    #if os(iOS)
+    private var pendingFit:(columns:Int,rows:Int,oblique:Bool)?
+    public override func layoutSubviews() {
+        super.layoutSubviews()
+        if let pendingFit,bounds.width>1,bounds.height>1 {
+            fit(columns:pendingFit.columns,rows:pendingFit.rows,oblique:pendingFit.oblique)
+        }
+    }
+    #endif
+    #if os(macOS)
     private var lastPoint=NSPoint.zero
     private var panGesture=false
+    #endif
     public var onCameraChanged:((CameraState)->Void)?
     public var cameraState:CameraState {
         CameraState(target:CurvePoint(Double(target.x),Double(target.y),Double(target.z)),orbitYaw:orbitYaw,orbitPitch:orbitPitch,
@@ -52,12 +71,17 @@ public final class BraidMetalView: SCNView {
     }
     public func restoreCamera(_ state:CameraState) throws {
         try state.validate()
-        target=SCNVector3(state.target.x,state.target.y,state.target.z)
+        #if os(iOS)
+        pendingFit=nil
+        #endif
+        target=SCNVector3(SceneScalar(state.target.x),SceneScalar(state.target.y),SceneScalar(state.target.z))
         orbitYaw=state.orbitYaw;orbitPitch=state.orbitPitch;cameraDistance=state.cameraDistance;fitDistance=state.fitDistance
         cameraNode.camera!.fieldOfView=CGFloat(state.fieldOfView)
         updateCamera()
     }
+    #if os(macOS)
     public override var acceptsFirstResponder:Bool { true }
+    #endif
     public override init(frame:CGRect = .zero) {
         super.init(frame:frame,options:[SCNView.Option.preferredRenderingAPI.rawValue:SCNRenderingAPI.metal.rawValue])
         antialiasingMode = .multisampling4X
@@ -66,6 +90,16 @@ public final class BraidMetalView: SCNView {
         cameraNode.camera!.projectionDirection = .vertical
         cameraNode.camera!.wantsHDR=true;cameraNode.camera!.wantsExposureAdaptation=false
         cameraNode.camera!.exposureOffset = -0.35
+        #if os(iOS)
+        for recognizer in gestureRecognizers ?? [] { recognizer.isEnabled=false }
+        let rotate=UIPanGestureRecognizer(target:self,action:#selector(rotateTouch(_:)))
+        rotate.minimumNumberOfTouches=1;rotate.maximumNumberOfTouches=1
+        let pan=UIPanGestureRecognizer(target:self,action:#selector(panTouch(_:)))
+        pan.minimumNumberOfTouches=2;pan.maximumNumberOfTouches=2
+        let pinch=UIPinchGestureRecognizer(target:self,action:#selector(pinchTouch(_:)))
+        pan.delegate=self;pinch.delegate=self
+        addGestureRecognizer(rotate);addGestureRecognizer(pan);addGestureRecognizer(pinch)
+        #endif
     }
     required init?(coder:NSCoder) { fatalError("init(coder:) is not supported") }
     public func display(_ braid:BraidCurves, meshes:[TubeMesh], settings:SceneSettings) {
@@ -77,7 +111,7 @@ public final class BraidMetalView: SCNView {
     }
     public func updatePlane(_ braid:BraidCurves, settings:SceneSettings) {
         scene?.rootNode.childNode(withName:"Backing plane",recursively:false)?.geometry=BraidScene.geometry(TubeMesher.plane(braid,settings:settings))
-        needsDisplay=true
+        requestDisplay()
     }
     /// Capture the live viewport, preserving its camera, lighting, background and pixel scale.
     public func captureImage() throws -> CGImage {
@@ -86,13 +120,23 @@ public final class BraidMetalView: SCNView {
         }
         SCNTransaction.flush()
         let image=snapshot()
-        guard let cg=image.cgImage(forProposedRect:nil,context:nil,hints:nil) else {
+        #if os(macOS)
+        let cgImage=image.cgImage(forProposedRect:nil,context:nil,hints:nil)
+        #else
+        let cgImage=image.cgImage
+        #endif
+        guard let cg=cgImage else {
             throw BraidError.invalid(L("Cannot capture the current 3D rendering."))
         }
         return cg
     }
     public var viewportPixelSize:CGSize {
+        #if os(macOS)
         let size=convertToBacking(bounds).size
+        #else
+        let scale=window?.screen.scale ?? contentScaleFactor
+        let size=CGSize(width:bounds.width*scale,height:bounds.height*scale)
+        #endif
         return CGSize(width:size.width.rounded(),height:size.height.rounded())
     }
 
@@ -118,6 +162,10 @@ public final class BraidMetalView: SCNView {
         return BraidPictureCapture(scene:frozen,camera:camera,size:size,viewport:bounds.size)
     }
     public func fit(columns:Int,rows:Int,oblique:Bool=false) {
+        #if os(iOS)
+        guard bounds.width>1,bounds.height>1 else { pendingFit=(columns,rows,oblique);return }
+        pendingFit=nil
+        #endif
         let aspect=Float(max(1,bounds.width)/max(1,bounds.height))
         fitDistance=max(Float(rows),Float(columns)/aspect)*0.5/tan(38*Float.pi/360)*1.15+1
         cameraDistance=fitDistance;orbitYaw=oblique ? -0.35 : 0;orbitPitch=oblique ? -0.35 : 0
@@ -127,17 +175,25 @@ public final class BraidMetalView: SCNView {
     public func zoom(factor:Float) { cameraDistance=min(fitDistance*15,max(0.5,cameraDistance*factor));updateCamera() }
     public func pan(dx:Float,dy:Float) {
         let scale=cameraDistance*0.001
-        let transform=cameraNode.presentation.worldTransform
-        target.x += (-CGFloat(dx)*transform.m11+CGFloat(dy)*transform.m21)*CGFloat(scale)
-        target.y += (-CGFloat(dx)*transform.m12+CGFloat(dy)*transform.m22)*CGFloat(scale)
-        target.z += (-CGFloat(dx)*transform.m13+CGFloat(dy)*transform.m23)*CGFloat(scale)
+        let transform=cameraNode.simdWorldTransform
+        target.x += .init((-dx*transform.columns.0.x+dy*transform.columns.1.x)*scale)
+        target.y += .init((-dx*transform.columns.0.y+dy*transform.columns.1.y)*scale)
+        target.z += .init((-dx*transform.columns.0.z+dy*transform.columns.1.z)*scale)
         updateCamera()
     }
     private func updateCamera() {
-        cameraNode.position=SCNVector3(target.x+CGFloat(cameraDistance*sin(orbitYaw)*cos(orbitPitch)),target.y+CGFloat(cameraDistance*sin(orbitPitch)),target.z+CGFloat(cameraDistance*cos(orbitYaw)*cos(orbitPitch)))
-        cameraNode.look(at:target);needsDisplay=true
+        cameraNode.position=SCNVector3(target.x + SceneScalar(cameraDistance*sin(orbitYaw)*cos(orbitPitch)),target.y + SceneScalar(cameraDistance*sin(orbitPitch)),target.z + SceneScalar(cameraDistance*cos(orbitYaw)*cos(orbitPitch)))
+        cameraNode.look(at:target);requestDisplay()
         onCameraChanged?(cameraState)
     }
+    private func requestDisplay() {
+        #if os(macOS)
+        needsDisplay=true
+        #else
+        setNeedsDisplay()
+        #endif
+    }
+    #if os(macOS)
     public override func mouseDown(with event:NSEvent) { window?.makeFirstResponder(self);lastPoint=event.locationInWindow;panGesture=event.modifierFlags.contains(.shift) }
     public override func rightMouseDown(with event:NSEvent) { lastPoint=event.locationInWindow;panGesture=true }
     public override func otherMouseDown(with event:NSEvent) { rightMouseDown(with:event) }
@@ -149,6 +205,20 @@ public final class BraidMetalView: SCNView {
     public override func otherMouseDragged(with event:NSEvent) { mouseDragged(with:event) }
     public override func scrollWheel(with event:NSEvent) { zoom(factor:exp(-min(80,max(-80,Float(event.scrollingDeltaY)))*0.01)) }
     public override func magnify(with event:NSEvent) { zoom(factor:exp(-Float(event.magnification))) }
+    #else
+    @objc private func rotateTouch(_ gesture:UIPanGestureRecognizer) {
+        let delta=gesture.translation(in:self);gesture.setTranslation(.zero,in:self)
+        if gesture.state == .changed { orbit(dx:-Float(delta.x)*0.008,dy:Float(delta.y)*0.008) }
+    }
+    @objc private func panTouch(_ gesture:UIPanGestureRecognizer) {
+        let delta=gesture.translation(in:self);gesture.setTranslation(.zero,in:self)
+        if gesture.state == .changed { pan(dx:Float(delta.x),dy:-Float(delta.y)) }
+    }
+    @objc private func pinchTouch(_ gesture:UIPinchGestureRecognizer) {
+        if gesture.state == .changed { zoom(factor:1/Float(gesture.scale)) }
+        gesture.scale=1
+    }
+    #endif
 }
 
 /// Owns its frozen scene; rendering is serialized and never touches the live view.
@@ -187,9 +257,23 @@ public final class BraidPictureCapture: @unchecked Sendable {
         renderer.scene=scene;renderer.pointOfView=framedCamera;renderer.autoenablesDefaultLighting=false
         let image=renderer.snapshot(atTime:0,with:size,antialiasingMode:.multisampling4X)
         try Task.checkCancellation()
-        guard let cg=image.cgImage(forProposedRect:nil,context:nil,hints:nil),cg.width==Int(size.width),cg.height==Int(size.height) else {
+        #if os(macOS)
+        let cgImage=image.cgImage(forProposedRect:nil,context:nil,hints:nil)
+        #else
+        let cgImage=image.cgImage
+        #endif
+        guard let cg=cgImage,cg.width==Int(size.width),cg.height==Int(size.height) else {
             throw BraidError.invalid(L("Cannot render the selected picture size."))
         }
         return cg
     }
 }
+
+#if os(iOS)
+extension BraidMetalView: UIGestureRecognizerDelegate {
+    public func gestureRecognizer(_ gestureRecognizer:UIGestureRecognizer,shouldRecognizeSimultaneouslyWith other:UIGestureRecognizer)->Bool {
+        (gestureRecognizer is UIPinchGestureRecognizer && other is UIPanGestureRecognizer && other.numberOfTouches==2) ||
+        (other is UIPinchGestureRecognizer && gestureRecognizer is UIPanGestureRecognizer && gestureRecognizer.numberOfTouches==2)
+    }
+}
+#endif

@@ -1,7 +1,13 @@
 import SwiftUI
 import BraidCore
 
-struct Braid3DView: NSViewRepresentable {
+#if os(macOS)
+typealias BraidViewRepresentable = NSViewRepresentable
+#else
+typealias BraidViewRepresentable = UIViewRepresentable
+#endif
+
+struct Braid3DView: BraidViewRepresentable {
     let braid:BraidCurves
     let meshes:[TubeMesh]
     let generation:Int
@@ -13,12 +19,19 @@ struct Braid3DView: NSViewRepresentable {
     let onViewReady:(BraidMetalView)->Void
     class Coordinator { var generation = -1;var reset = -1;var settings:SceneSettings? }
     func makeCoordinator()->Coordinator { Coordinator() }
-    func makeNSView(context:Context)->BraidMetalView {
+    #if os(iOS)
+    func makeUIView(context:Context)->BraidMetalView { makeView() }
+    func updateUIView(_ view:BraidMetalView,context:Context) { updateView(view,context:context) }
+    #else
+    func makeNSView(context:Context)->BraidMetalView { makeView() }
+    func updateNSView(_ view:BraidMetalView,context:Context) { updateView(view,context:context) }
+    #endif
+    private func makeView()->BraidMetalView {
         let view=BraidMetalView()
         onViewReady(view)
         return view
     }
-    func updateNSView(_ view:BraidMetalView,context:Context) {
+    private func updateView(_ view:BraidMetalView,context:Context) {
         let c=context.coordinator
         // Scene setup and restoration must not publish the intermediate fitted camera.
         view.onCameraChanged=nil

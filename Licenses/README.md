@@ -4,11 +4,8 @@ This directory preserves the licenses and author notices for the third-party
 projects downloaded and compiled into BraidArt's bundled COIN-OR solver. These
 files are checked into the repository and copied into the app bundle.
 
-BraidArt's original code and project-owned materials use Apache 2.0; see the
-repository's [LICENSE](../LICENSE), [NOTICE](../NOTICE) and
-[licensing scope](../Docs/Licensing.md). The components below retain their own
-licenses and are excluded from the root Apache license. In the app bundle,
-BraidArt's own LICENSE and NOTICE are in `Contents/Resources/`.
+The components below retain their own licenses and copyright notices. Each
+entry links to the upstream source and to the unchanged license and author files.
 
 | Project | Version | Origin | Local license and authors |
 | --- | --- | --- | --- |
@@ -62,16 +59,24 @@ The Swift and Metal implementations were written for BraidArt; upstream MATLAB
 or other implementation code was not copied. No third-party code license is
 invented for these numerical reference values.
 
-The original Mathematica notebooks and `Braids.js` were supplied by the project
-owner. Their repository origin is [christophe0606/BraidArt](https://github.com/christophe0606/BraidArt).
-Project-owned notebook code and scripts are covered by BraidArt's Apache 2.0
-license; separately identified third-party material retains its own terms.
 Mathematica and Blender are not bundled. Apple frameworks and the system's
-libc++, zlib and bzip2 libraries are linked from macOS, not copied into the app.
+libc++, zlib and bzip2 libraries are provided by macOS/iOS rather than copied
+into the app.
+
+## Help illustrations
+
+- Eileen Collins photograph: NASA, via scikit-image. The image record identifies
+  it as **public domain**, with no known copyright restrictions.
+- [Original NASA photograph](https://flic.kr/p/r9qvLn)
+- [Image record and rights](https://scikit-image.org/docs/stable/api/skimage.data.html#skimage.data.astronaut)
+- [NASA media usage guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/)
+
+The cropped portrait, woven picture and 3D artwork are adaptations produced with
+BraidArt from that photograph.
 
 ## App bundle
 
 `Scripts/package-licenses.sh` copies this entire directory, with the origin URLs,
-into `BraidArt.app/Contents/Resources/Solver/licenses/` and includes the overview
-as `BraidArt.app/Contents/Resources/Solver/ThirdParty.md`. Packaging reads these
+into `Contents/Resources/Solver/licenses/` on macOS and `Solver/licenses/` on
+iOS. The overview is included as `Solver/ThirdParty.md`. Packaging reads these
 checked-in notices even when the downloaded source/build cache is unavailable.

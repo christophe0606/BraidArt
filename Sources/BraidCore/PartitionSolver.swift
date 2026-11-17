@@ -117,10 +117,11 @@ public enum PartitionSolver {
         // CBC may say 'Optimal (within gap tolerance)': that is feasible, not proven exact.
         return (ids,lower.hasPrefix("optimal") && !lower.contains("gap"),header)
     }
-    public static func solve(image: PixelImage, settings: Settings,
+    public static func solve(image: PixelImage, settings: Settings, execution:PartitionExecutionControl? = nil,
                              progress: @escaping @Sendable (Double,String) async -> Void = {_,_ in}) async throws -> (TileData,SolveResult) {
         try settings.validate();try image.validate();try Task.checkCancellation()
-        let started=Date(),data=TileData(settings:settings)
+        let started=Date(),initialPause=execution?.pausedSeconds ?? 0,data=TileData(settings:settings)
+        try await execution?.waitUntilForeground()
         await progress(0,L("Computing CIE2000 tile errors…"))
         let costs=try CostEngine.compute(image:image,tiles:data)
         let s=settings.partitionSize,cols=(image.width+s-1)/s,rows=(image.height+s-1)/s
@@ -132,20 +133,36 @@ public enum PartitionSolver {
         for (index,coordinate) in order.enumerated() {
             try Task.checkCancellation()
             let (r,c)=coordinate,x=c*s,y=r*s,w=min(s,image.width-x),h=min(s,image.height-y)
-            await progress(Double(index)/Double(order.count),L("Solving part %@ of %@ · %@ × %@ tiles", String(describing: index+1), String(describing: order.count), String(describing: w), String(describing: h)))
-            let left: [Int]? = c>0 ? (0..<h).map{solution[y+$0][x-1]} : nil
-            let top: [Int]? = r>0 ? (0..<w).map{solution[y-1][x+$0]} : nil
-            let problem=try makeProblem(block:Block(x:x,y:y,width:w,height:h),image:image,data:data,costs:costs,left:left,top:top)
-            let blockStart=Date()
-            let text=try await CBCRunner.solve(problem:problem,settings:settings)
-            let parsed=try parseSolution(text,problem:problem,data:data)
-            var objective=0.0
-            for yy in 0..<h { for xx in 0..<w {
-                let id=parsed.ids[yy*w+xx];solution[y+yy][x+xx]=id;objective+=costs[(y+yy)*image.width+x+xx,id-1]
-            }}
-            reports.append(PartitionReport(row:r,column:c,width:w,height:h,objective:objective,provenOptimal:parsed.optimal,solverStatus:parsed.status,elapsedSeconds:Date().timeIntervalSince(blockStart)))
+            while true {
+                let lease=try await execution?.beginPartition(index:index,total:order.count)
+                do {
+                    await progress(Double(index)/Double(order.count),L("Solving part %@ of %@ · %@ × %@ tiles", String(describing: index+1), String(describing: order.count), String(describing: w), String(describing: h)))
+                    let left: [Int]? = c>0 ? (0..<h).map{solution[y+$0][x-1]} : nil
+                    let top: [Int]? = r>0 ? (0..<w).map{solution[y-1][x+$0]} : nil
+                    let problem=try makeProblem(block:Block(x:x,y:y,width:w,height:h),image:image,data:data,costs:costs,left:left,top:top)
+                    let blockStart=Date()
+                    let text=try await CBCRunner.solve(problem:problem,settings:settings,execution:execution,lease:lease)
+                    let parsed=try parseSolution(text,problem:problem,data:data)
+                    var objective=0.0
+                    for yy in 0..<h { for xx in 0..<w {
+                        let id=parsed.ids[yy*w+xx];solution[y+yy][x+xx]=id;objective+=costs[(y+yy)*image.width+x+xx,id-1]
+                    }}
+                    reports.append(PartitionReport(row:r,column:c,width:w,height:h,objective:objective,provenOptimal:parsed.optimal,solverStatus:parsed.status,elapsedSeconds:Date().timeIntervalSince(blockStart)))
+                    if let lease { execution?.endPartition(lease,completed:true) }
+                    break
+                } catch {
+                    let interrupted=lease.map { execution?.endPartition($0,completed:false) ?? false } ?? false
+                    try Task.checkCancellation()
+                    // OS expiration retries only this uncommitted partition.
+                    // The solution grid and reports for prior partitions stay intact.
+                    if interrupted { continue }
+                    throw error
+                }
+            }
         }
-        let result=SolveResult(solution:solution,reports:reports,costBackend:costs.backend,elapsedSeconds:Date().timeIntervalSince(started))
+        try await execution?.waitUntilForeground()
+        let elapsed=max(0,Date().timeIntervalSince(started)-((execution?.pausedSeconds ?? 0)-initialPause))
+        let result=SolveResult(solution:solution,reports:reports,costBackend:costs.backend,elapsedSeconds:elapsed)
         try result.validate(tileData:data);await progress(1,L("Rendering result…"));return (data,result)
     }
 }

@@ -16,14 +16,15 @@ done
 for PROJECT in CoinUtils Clp Cgl Cbc; do
     test -s "$ROOT/Licenses/$PROJECT/TOP-LEVEL-AUTHORS"
 done
-for NOTICE in LICENSE NOTICE Docs/Licensing.md Licenses/README.md Licenses/Bison/GPL-2.0.txt Licenses/Bison/GENERATED-PARSER-NOTICE.txt Licenses/Bison/ORIGIN.md Licenses/Cbc/AMPL-NOTICE.txt Licenses/Clp/AMPL-NOTICE.txt Licenses/CoinUtils/RATIONAL-NOTICE.txt Docs/ThirdParty.md; do
+for NOTICE in NOTICE Docs/Licensing.md Licenses/README.md Licenses/Bison/GPL-2.0.txt Licenses/Bison/GENERATED-PARSER-NOTICE.txt Licenses/Bison/ORIGIN.md Licenses/Cbc/AMPL-NOTICE.txt Licenses/Clp/AMPL-NOTICE.txt Licenses/CoinUtils/RATIONAL-NOTICE.txt Docs/ThirdParty.md; do
     test -s "$ROOT/$NOTICE"
 done
 mkdir -p "$DESTINATION/licenses"
-cp -R "$ROOT/Licenses/." "$DESTINATION/licenses/"
+rsync -a --delete "$ROOT/Licenses/" "$DESTINATION/licenses/"
 cp "$ROOT/Docs/ThirdParty.md" "$DESTINATION/ThirdParty.md"
 # Keep repository-relative inventory links valid in the standalone solver notices.
-cp "$ROOT/LICENSE" "$DESTINATION/LICENSE"
+# Remove an app license left by an earlier build; only upstream licenses belong here.
+rm -f "$DESTINATION/LICENSE"
 cp "$ROOT/NOTICE" "$DESTINATION/NOTICE"
 mkdir -p "$DESTINATION/Docs"
 cp "$ROOT/Docs/Licensing.md" "$DESTINATION/Docs/Licensing.md"

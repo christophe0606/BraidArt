@@ -1,0 +1,104 @@
+name: BraidArt-iOS
+options:
+  bundleIdPrefix: com.christophefav
+  deploymentTarget:
+    iOS: '26.0'
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: 9427Z6EVKX
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    LIBRARY_SEARCH_PATHS: '$(inherited) $(SRCROOT)/../.build/solver-$(PLATFORM_NAME)-$(CURRENT_ARCH)/lib'
+    SWIFT_INCLUDE_PATHS: '$(SRCROOT)/../Sources/CBCLibrary'
+    OTHER_LDFLAGS: '$(inherited) -lBraidCBC -lc++ -lz -lbz2'
+    TARGETED_DEVICE_FAMILY: '1,2'
+targets:
+  BraidCore:
+    type: framework
+    platform: iOS
+    sources:
+      - path: ../Sources/BraidCore
+        excludes: [Resources]
+      - path: ../Sources/BraidCore/Resources/en.lproj
+        buildPhase: resources
+      - path: ../Sources/BraidCore/Resources/fr.lproj
+        buildPhase: resources
+      - path: ../Sources/BraidCore/Resources/ColorCost.metal
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophefav.BraidArt.core
+        GENERATE_INFOPLIST_FILE: YES
+        SKIP_INSTALL: YES
+    preBuildScripts:
+      - name: Build native CBC solver
+        script: |
+          for solver_arch in $ARCHS; do
+            bash "$SRCROOT/../Scripts/build-solver-ios.sh" "$PLATFORM_NAME" "$solver_arch"
+          done
+        basedOnDependencyAnalysis: false
+  BraidArt:
+    type: application
+    platform: iOS
+    sources:
+      - path: .
+        excludes: [project.yml, Info.plist, BraidArt-iOS.xcodeproj, Tests]
+      - path: ../Sources/BraidArt
+        excludes: [Resources, ContentView.swift, BraidArtApp.swift, AboutView.swift, AppIcon.swift]
+      - path: ../Sources/BraidArt/Resources/Help
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - target: BraidCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophefav.BraidArt
+        INFOPLIST_FILE: Info.plist
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+        SUPPORTS_MACCATALYST: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    postBuildScripts:
+      - name: Bundle license notices
+        script: |
+          bash "$SRCROOT/../Scripts/package-licenses.sh" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Solver"
+          rm -f "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/LICENSE" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Licensing.md"
+          cp "$SRCROOT/../NOTICE" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/"
+        basedOnDependencyAnalysis: false
+  BraidArtTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests/MobileTests.swift
+      - path: ../Tests/BraidArtTests/ThirdPartyTests.swift
+      - path: ../Tests/BraidArtTests/FirstLaunchHelpTests.swift
+      - path: ../Tests/BraidCoreTests/PartitionPauseTests.swift
+      - path: ../Tests/VideoSupport/VideoFixture.swift
+    dependencies:
+      - target: BraidArt
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophefav.BraidArt.tests
+  BraidArtUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/MobileUITests.swift
+    dependencies:
+      - target: BraidArt
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophefav.BraidArt.uitests
+schemes:
+  BraidArt:
+    build:
+      targets:
+        BraidArt: all
+    test:
+      targets:
+        - BraidArtTests
+        - BraidArtUITests

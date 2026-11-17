@@ -414,3 +414,67 @@
 "Choose an image or video to begin." = "Choisissez une image ou une vidéo pour commencer.";
 
 "Could not allocate the CBC solver." = "Impossible d’allouer le solveur CBC.";
+
+"Settings" = "Réglages";
+
+"Photos" = "Photos";
+
+"Files" = "Fichiers";
+
+"Save to" = "Enregistrer dans";
+
+"Choose a picture or video from Photos or Files." = "Choisissez une image ou une vidéo dans Photos ou Fichiers.";
+
+"Pinch to scale. Drag to move or resize the crop." = "Pincez pour changer l’échelle. Faites glisser pour déplacer ou redimensionner le recadrage.";
+
+"One finger to rotate · Two fingers to pan · Pinch to zoom" = "Un doigt pour tourner · Deux doigts pour déplacer · Pincez pour zoomer";
+
+"Use the export button above to save pictures, videos, PDF and 3D objects." = "Utilisez le bouton d’exportation en haut pour enregistrer des images, vidéos, PDF et objets 3D.";
+
+"Saving to Photos…" = "Enregistrement dans Photos…";
+
+"Saved to Photos." = "Enregistré dans Photos.";
+
+"Saved to Files." = "Enregistré dans Fichiers.";
+
+"Export cancelled." = "Exportation annulée.";
+
+"Exporting…" = "Exportation…";
+
+"Cannot open the selected picture or video." = "Impossible d’ouvrir l’image ou la vidéo sélectionnée.";
+
+"Allow BraidArt to add pictures and videos in Settings → Privacy & Security → Photos, or save to Files." = "Autorisez BraidArt à ajouter des images et vidéos dans Réglages → Confidentialité et sécurité → Photos, ou enregistrez dans Fichiers.";
+
+"Pinch to zoom the woven image. Drag to move around when zoomed in." = "Pincez pour zoomer sur l’image tissée. Faites glisser pour vous déplacer dans l’image agrandie.";
+
+"Save pictures and videos to Photos or Files. Save PDF, projects and 3D objects to Files." = "Enregistrez les images et vidéos dans Photos ou Fichiers. Enregistrez les PDF, projets et objets 3D dans Fichiers.";
+
+"Licenses & notices" = "Licences et mentions";
+
+"Cannot read this notice." = "Impossible de lire cette mention.";
+
+"Hide sidebar" = "Masquer la barre latérale";
+
+"Show sidebar" = "Afficher la barre latérale";
+
+"Resize sidebar" = "Redimensionner la barre latérale";
+
+"%@ points" = "%@ points";
+
+"Try different colors and levels of detail to find a look you like. Save your project to return to it later, or use the export button to keep and share your artwork as a picture or a 3D object." = "Essayez différentes couleurs et différents niveaux de détail pour trouver le style qui vous plaît. Enregistrez votre projet pour y revenir plus tard, ou utilisez le bouton d’exportation pour conserver et partager votre création sous forme d’image ou d’objet 3D.";
+
+"Weaving image" = "Tressage de l’image";
+
+"Preparing to weave…" = "Préparation du tressage…";
+
+"Part %@ of %@" = "Partie %@ sur %@";
+
+"Finishing current partition" = "Fin de la partition en cours";
+
+"Paused until you return to BraidArt." = "En pause jusqu’à votre retour dans BraidArt.";
+
+"Finishing the current partition before pausing…" = "Fin de la partition en cours avant la mise en pause…";
+
+"Weaving paused" = "Tressage en pause";
+
+"Return to BraidArt to continue." = "Revenez dans BraidArt pour continuer.";

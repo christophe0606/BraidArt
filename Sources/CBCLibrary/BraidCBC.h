@@ -1,4 +1,4 @@
-// Copyright 2026 Christophe Favergeon. Apache-2.0.
+// Copyright 2026 Christophe Favergeon. All rights reserved.
 // BraidArt-owned ABI; no upstream implementation is copied here.
 #ifndef BRAID_CBC_H
 #define BRAID_CBC_H
