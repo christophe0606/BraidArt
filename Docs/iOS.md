@@ -8,6 +8,9 @@ or later; the Mac app continues to support macOS 14 (Sonoma) or later.
   to change its width; the sidebar button in the toolbar hides or restores it.
   Width and visibility are remembered across launches.
 - iPhone: portrait and landscape, with Prepare, Tile Library, Result, 3D and Settings tabs.
+  The French phone tab uses the short label “Tuiles”; the full iPad title and
+  English label remain unchanged. In phone landscape, the 3D controls use one
+  compact row and the gesture reminder is hidden to leave more room for the scene.
 - 3D: drag with one finger to rotate, two fingers to pan, and pinch to zoom.
 - Result: pinch to zoom and drag the enlarged picture; Fit resets the view.
 - Open pictures and videos through the standard Photos picker or Files picker.
@@ -89,8 +92,20 @@ Files exports, camera controls, touch recognizer configuration, 3D PNG capture,
 and video decoding/weaving/MP4 export with audio. The iPad UI test exercises
 weaving, result pinch zoom, 3D drag/pinch, destination choice and the Files picker,
 and saves screenshots. Its synthetic fixture is enabled only in Debug builds
-with `--ui-fixture`. Photos authorization/saving and two-finger panning should also
-be checked manually. Physical iPhone testing follows iPad acceptance.
+with `--ui-fixture`.
+
+Physical iPhone validation was completed on an iPhone 12 Pro Max running iOS
+27.0.1. Fifteen hosted tests passed, including native solving, camera and gesture
+configuration, video with audio, Photos video saving, export contents, and pause
+and cancellation behavior. Seven UI tests passed across the phone verification
+runs: English layout and rotation, result pinch, one-finger 3D rotation and pinch,
+French tab labels in both orientations, PNG saving to Photos and Files, 3D PNG,
+PDF/GLB/USDZ saving through Files, first-launch help, and extended background
+pause/resume. The export tests create sample outputs in Photos and Files.
+
+XCTest's public touch API cannot synthesize a two-finger drag. The two-finger pan
+recognizer configuration and camera translation are covered by the hosted test;
+the physical two-finger panning gesture still needs manual verification.
 
 `PartitionPauseTests` covers partition-boundary pause/resume, expiration retry,
 cancellation while paused, concurrent waiters, and video with audio. The device

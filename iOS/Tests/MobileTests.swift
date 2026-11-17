@@ -1,6 +1,7 @@
 import XCTest
 import UIKit
 import AVFoundation
+import Photos
 import BraidCore
 @testable import BraidArt
 
@@ -63,9 +64,44 @@ final class MobileTests:XCTestCase {
         let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:folder) }
+        let model=try await videoModel(in:folder)
+        model.weaveVideo()
+        let request=try XCTUnwrap(model.mobileExport)
+        XCTAssertTrue(request.allowsPhotos)
+        request.start(.files)
+        let url=try await completedFile(model)
+        let asset=AVURLAsset(url:url)
+        let video=try await asset.loadTracks(withMediaType:.video)
+        let audio=try await asset.loadTracks(withMediaType:.audio)
+        XCTAssertEqual(video.count,1);XCTAssertEqual(audio.count,1)
+        let size=try await video.first!.load(.naturalSize)
+        XCTAssertEqual(size.width,128);XCTAssertEqual(size.height,128)
+        model.finishFileExport(false)
+    }
+    func testVideoCanSaveToPhotosWhenAuthorized() async throws {
+        guard PHPhotoLibrary.authorizationStatus(for:.addOnly) == .authorized else {
+            throw XCTSkip("Grant add-only Photos permission through the picture-export UI test first")
+        }
+        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
+        defer { try? FileManager.default.removeItem(at:folder) }
+        let model=try await videoModel(in:folder)
+        model.weaveVideo()
+        let request=try XCTUnwrap(model.mobileExport)
+        XCTAssertTrue(request.allowsPhotos)
+        request.start(.photos)
+        for _ in 0..<300 {
+            if model.status==L("Saved to Photos.") || model.error != nil { break }
+            try await Task.sleep(for:.milliseconds(100))
+        }
+        XCTAssertNil(model.error)
+        XCTAssertEqual(model.status,L("Saved to Photos."))
+        XCTAssertNil(model.exportedFile,"A successful Photos save must not open Files")
+    }
+    private func videoModel(in folder:URL) async throws -> AppModel {
         let source=folder.appendingPathComponent("fixture.mov")
         try await VideoFixture.make(at:source,audio:true)
-        let model=AppModel()
+        let model=AppModel(defaults:UserDefaults(suiteName:UUID().uuidString)!)
         model.settings.columns=8;model.settings.partitionSize=2;model.settings.threads=1
         model.settings.outputSize = .custom(try CustomPictureSize(name:"Test",width:128,height:128))
         model.open(url:source)
@@ -80,18 +116,7 @@ final class MobileTests:XCTestCase {
             try await Task.sleep(for:.milliseconds(100))
         }
         XCTAssertTrue(model.canWeaveVideo)
-        model.weaveVideo()
-        let request=try XCTUnwrap(model.mobileExport)
-        XCTAssertTrue(request.allowsPhotos)
-        request.start(.files)
-        let url=try await completedFile(model)
-        let asset=AVURLAsset(url:url)
-        let video=try await asset.loadTracks(withMediaType:.video)
-        let audio=try await asset.loadTracks(withMediaType:.audio)
-        XCTAssertEqual(video.count,1);XCTAssertEqual(audio.count,1)
-        let size=try await video.first!.load(.naturalSize)
-        XCTAssertEqual(size.width,128);XCTAssertEqual(size.height,128)
-        model.finishFileExport(false)
+        return model
     }
     func testTouchConfigurationCameraAndPictureCapture() async throws {
         let model=try await wovenModel()

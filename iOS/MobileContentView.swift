@@ -5,10 +5,12 @@ import UniformTypeIdentifiers
 struct MobileContentView:View {
     @ObservedObject var model:AppModel
     @State private var showingInfo=false
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @AppStorage("iPadSidebarWidth") private var sidebarWidth=330.0
     @AppStorage("iPadSidebarVisible") private var sidebarVisible=true
     @State private var sidebarResizeStart:Double?
     private var isPad:Bool { UIDevice.current.userInterfaceIdiom == .pad }
+    private var isCompactPhone:Bool { !isPad && verticalSizeClass == .compact }
     private let tabs=[("Prepare","crop"),("Tile Library","square.grid.3x3"),("Result","photo"),("3D","cube"),("Settings","slider.horizontal.3")]
     var body:some View {
         NavigationStack {
@@ -33,7 +35,7 @@ struct MobileContentView:View {
                 } else {
                     TabView(selection:$model.selectedTab) {
                         ForEach(0..<5) { index in
-                            workspace(index).tabItem { Label(L(tabs[index].0),systemImage:tabs[index].1) }.tag(index)
+                            workspace(index).tabItem { Label(L(index==1 ? "Tile Library tab" : tabs[index].0),systemImage:tabs[index].1) }.tag(index)
                         }
                     }
                 }
@@ -55,6 +57,7 @@ struct MobileContentView:View {
                         Button(L("Cancel"),role:.cancel,action:model.cancel)
                     } else {
                         Button(L("Weave Image"),action:model.solve)
+                            .font(isPad ? .body : .subheadline)
                             .fixedSize(horizontal:true,vertical:false)
                             .disabled(!model.canWeavePicture).tint(.orange).accessibilityIdentifier("weave")
                     }
@@ -154,12 +157,12 @@ struct MobileContentView:View {
     private var statusBar:some View {
         VStack(alignment:.leading,spacing:4) {
             if model.blocksEditing { ProgressView(value:model.progress) }
-            Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            Text(model.status).font(.caption).foregroundStyle(.secondary).lineLimit(isCompactPhone ? 1 : 2)
                 .frame(maxWidth:.infinity,alignment:.leading).accessibilityIdentifier("status")
                 #if DEBUG
                 .accessibilityValue(model.backgroundWeavingTestValue)
                 #endif
-        }.padding(.horizontal,14).padding(.vertical,8).background(.bar)
+        }.padding(.horizontal,14).padding(.vertical,isCompactPhone ? 4 : 8).background(.bar)
     }
     @ViewBuilder private var prepare:some View {
         if model.sourceImage == nil && model.prepared == nil {
@@ -240,8 +243,9 @@ struct MobileContentView:View {
                         ColorPicker(L("Backing plane"),selection:Binding(get:{model.sceneSettings.planeColor.color},set:{model.sceneSettings.planeColor=RGB(color:$0)}),supportsOpacity:false).fixedSize()
                         Text(L("Clearance")).font(.caption)
                         Slider(value:$model.sceneSettings.planeDistance,in:0...3).frame(width:110)
-                        DimensionPicker(title:L("Picture dimensions"),selection:$model.pictureExportSize,customDimensions:model.customDimensions,includeViewport:true,onManage:{model.dimensionManagerTarget = .picture})
-                    }.padding(12)
+                        DimensionPicker(title:L("Picture dimensions"),selection:$model.pictureExportSize,customDimensions:model.customDimensions,includeViewport:true,compact:isCompactPhone,onManage:{model.dimensionManagerTarget = .picture})
+                    }.font(isCompactPhone ? .caption : .body)
+                        .padding(.horizontal,12).padding(.vertical,isCompactPhone ? 4 : 12)
                 }
                 if model.resultNeedsWeaving { staleResult }
                 Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,camera:model.cameraState,onCameraChanged:model.cameraChanged,onViewReady:model.register3DView)
@@ -252,7 +256,9 @@ struct MobileContentView:View {
                             Rectangle().strokeBorder(.red,lineWidth:2).frame(width:frame.width,height:frame.height).position(x:frame.midX,y:frame.midY)
                         }.allowsHitTesting(false)
                     }
-                Text(L("One finger to rotate · Two fingers to pan · Pinch to zoom")).font(.caption).foregroundStyle(.secondary).padding(8)
+                if !isCompactPhone {
+                    Text(L("One finger to rotate · Two fingers to pan · Pinch to zoom")).font(.caption).foregroundStyle(.secondary).padding(8)
+                }
             } else { empty("cube",L("Curves become a sculpture"),L("Weave an image or open a saved project to inspect its connected strands in 3D.")) }
         }.frame(maxWidth:.infinity,maxHeight:.infinity).disabled(model.busy)
     }

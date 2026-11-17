@@ -6,6 +6,7 @@ struct DimensionPicker:View {
     @Binding var selection:PictureExportSize
     let customDimensions:[PictureExportSize]
     var includeViewport=false
+    var compact=false
     var onManage:(()->Void)?
 
     private var customChoices:[PictureExportSize] {
@@ -17,6 +18,9 @@ struct DimensionPicker:View {
     }
     var body:some View {
         #if os(iOS)
+        if compact {
+            HStack(spacing:8) { dimensionMenu.labelsHidden();manageButton }
+        } else {
         VStack(alignment:.leading,spacing:4) {
             Text(title).font(.caption).foregroundStyle(.secondary)
             HStack(spacing:8) {
@@ -24,6 +28,7 @@ struct DimensionPicker:View {
                 manageButton
             }
         }.fixedSize(horizontal:false,vertical:true)
+        }
         #else
         HStack(spacing:8) { dimensionMenu;manageButton }
         #endif

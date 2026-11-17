@@ -23,7 +23,10 @@ final class LocalizationTests: XCTestCase {
             }
         }
         for (key,value) in english {
-            XCTAssertEqual(value,key,"English remains the development text")
+            // The phone tab needs a shorter French translation while retaining
+            // the same English text as the full library title.
+            let developmentText=key=="Tile Library tab" ? "Tile Library" : key
+            XCTAssertEqual(value,developmentText,"English remains the development text")
             let translated=try XCTUnwrap(french[key])
             XCTAssertFalse(translated.isEmpty,key)
             XCTAssertEqual(placeholders(value),placeholders(translated),key)

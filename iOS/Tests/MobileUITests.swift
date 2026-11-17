@@ -2,6 +2,190 @@ import XCTest
 
 final class MobileUITests:XCTestCase {
     @MainActor
+    func testIPhoneFrenchTabLabelsFitBothOrientations() throws {
+        continueAfterFailure=false
+        let app=XCUIApplication()
+        app.launchArguments=["-hasShownFirstLaunchHelp","YES","-AppleLanguages","(fr)","-AppleLocale","fr_FR"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        XCTAssertTrue(app.buttons["weave"].waitForExistence(timeout:20))
+        let tabs=app.tabBars.firstMatch
+        for orientation in [UIDeviceOrientation.portrait,.landscapeLeft] {
+            XCUIDevice.shared.orientation=orientation
+            for name in ["Préparer","Tuiles","Résultat","3D","Réglages"] {
+                XCTAssertTrue(tabs.buttons[name].isHittable,"Missing French phone tab: \(name)")
+            }
+            XCTAssertFalse(tabs.buttons["Bibliothèque de tuiles"].exists)
+            tabs.buttons["Tuiles"].tap()
+            screenshot(orientation == .portrait ? "iPhone French portrait short tile tab" : "iPhone French landscape short tile tab")
+            tabs.buttons["Résultat"].tap()
+            XCTAssertTrue(app.buttons["weave"].isHittable)
+            XCTAssertTrue(app.buttons["export"].isHittable)
+            XCTAssertGreaterThan(app.buttons["export"].frame.minX-app.buttons["weave"].frame.maxX,0)
+        }
+    }
+    @MainActor
+    func testIPhoneTabsRotationAndTouchControls() throws {
+        continueAfterFailure=false
+        let app=launchPhoneFixture()
+        let tabs=app.tabBars.firstMatch
+        for name in ["Prepare","Tile Library","Result","3D","Settings"] {
+            XCTAssertTrue(tabs.buttons[name].isHittable,"Missing phone tab: \(name)")
+        }
+        XCTAssertFalse(app.buttons["sidebarToggle"].exists)
+        XCTAssertFalse(app.buttons["export"].exists)
+        screenshot("iPhone portrait prepare")
+        tabs.buttons["Settings"].tap()
+        XCTAssertTrue(app.descendants(matching:.any)["sidebarImageWidth"].firstMatch.waitForExistence(timeout:5))
+        screenshot("iPhone portrait settings tab")
+        rotatePhone(app,to:.landscapeLeft,landscape:true)
+        screenshot("iPhone landscape settings tab")
+        tabs.buttons["Tile Library"].tap()
+        XCTAssertFalse(app.buttons["export"].exists)
+        screenshot("iPhone landscape tile library")
+        tabs.buttons["Prepare"].tap()
+        XCTAssertTrue(app.buttons["weave"].isHittable)
+        screenshot("iPhone landscape prepare")
+        rotatePhone(app,to:.portrait,landscape:false)
+        weavePhoneFixture(app)
+        let result=app.scrollViews["resultCanvas"]
+        let original=result.screenshot().pngRepresentation
+        result.pinch(withScale:2,velocity:1)
+        XCTAssertNotEqual(original,result.screenshot().pngRepresentation,"Result pinch should zoom the picture")
+        screenshot("iPhone portrait result pinch zoom")
+        result.swipeLeft()
+        rotatePhone(app,to:.landscapeRight,landscape:true)
+        XCTAssertTrue(result.isHittable)
+        screenshot("iPhone landscape result after rotation")
+        app.buttons["Fit"].tap()
+        tabs.buttons["3D"].tap()
+        let scene=app.descendants(matching:.any)["sculptureCanvas"].firstMatch
+        XCTAssertTrue(scene.waitForExistence(timeout:10))
+        XCTAssertGreaterThan(min(scene.frame.width,scene.frame.height),110,"Landscape controls must leave room to manipulate the sculpture")
+        let front=scene.screenshot().pngRepresentation
+        scene.coordinate(withNormalizedOffset:CGVector(dx:0.45,dy:0.5)).press(forDuration:0.05,thenDragTo:scene.coordinate(withNormalizedOffset:CGVector(dx:0.65,dy:0.65)))
+        XCTAssertNotEqual(front,scene.screenshot().pngRepresentation,"One-finger drag should rotate the sculpture")
+        let rotated=scene.screenshot().pngRepresentation
+        scene.pinch(withScale:1.5,velocity:1)
+        XCTAssertNotEqual(rotated,scene.screenshot().pngRepresentation,"3D pinch should zoom the sculpture")
+        screenshot("iPhone landscape 3D rotated and zoomed")
+        rotatePhone(app,to:.portrait,landscape:false)
+        let portrait=scene.screenshot().pngRepresentation
+        scene.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).press(forDuration:0.05,thenDragTo:scene.coordinate(withNormalizedOffset:CGVector(dx:0.6,dy:0.55)))
+        XCTAssertNotEqual(portrait,scene.screenshot().pngRepresentation,"The 3D canvas must accept touch after rotation")
+        XCTAssertTrue(app.buttons["weave"].isHittable)
+        XCTAssertTrue(app.buttons["export"].isHittable)
+        XCTAssertGreaterThan(app.buttons["export"].frame.minX-app.buttons["weave"].frame.maxX,0)
+        screenshot("iPhone portrait 3D after rotation")
+    }
+    @MainActor
+    func testIPhone3DPictureExport() throws {
+        continueAfterFailure=false
+        let app=launchPhoneFixture()
+        weavePhoneFixture(app)
+        app.tabBars.buttons["3D"].tap()
+        XCTAssertTrue(app.descendants(matching:.any)["sculptureCanvas"].firstMatch.waitForExistence(timeout:10))
+        app.buttons["export"].tap()
+        app.buttons["3D View as PNG…"].tap()
+        XCTAssertTrue(app.buttons["Photos"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["Files"].exists)
+        app.buttons["Files"].tap()
+        savePhoneFile(app,name:"BraidArt-iPhone-3D-Test-\(UUID().uuidString.prefix(8)).png")
+        expectStatus(app,"Saved to Files.")
+        screenshot("iPhone 3D picture exported to Files")
+    }
+    @MainActor
+    func testIPhonePicturePhotosAndFilesExport() throws {
+        continueAfterFailure=false
+        let app=launchPhoneFixture()
+        weavePhoneFixture(app)
+        app.buttons["export"].tap()
+        app.buttons["Result as PNG…"].tap()
+        XCTAssertTrue(app.buttons["Photos"].waitForExistence(timeout:5))
+        XCTAssertTrue(app.buttons["Files"].exists)
+        screenshot("iPhone picture destination choices")
+        app.buttons["Photos"].tap()
+        let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+        let permission=springboard.alerts.firstMatch
+        if permission.waitForExistence(timeout:5) {
+            let allow=permission.buttons.matching(NSPredicate(format:"label BEGINSWITH 'Allow' OR label == 'Add Photos Only' OR label BEGINSWITH 'Autoriser' OR label BEGINSWITH 'Ajouter'")).firstMatch
+            XCTAssertTrue(allow.exists,permission.debugDescription)
+            allow.tap()
+        }
+        expectStatus(app,"Saved to Photos.")
+        screenshot("iPhone picture saved to Photos")
+        app.buttons["export"].tap()
+        app.buttons["Result as PNG…"].tap()
+        app.buttons["Files"].tap()
+        savePhoneFile(app,name:"BraidArt-iPhone-Test-\(UUID().uuidString.prefix(8)).png")
+        expectStatus(app,"Saved to Files.")
+        screenshot("iPhone picture saved to Files")
+    }
+    @MainActor
+    func testIPhonePDFAnd3DObjectsUseFiles() throws {
+        continueAfterFailure=false
+        let app=launchPhoneFixture()
+        weavePhoneFixture(app)
+        for (title,suffix) in [("Vector PDF…","pdf"),("3D Object (GLB)…","glb"),("3D Object (USDZ)…","usdz")] {
+            app.buttons["export"].tap()
+            app.buttons[title].tap()
+            XCTAssertTrue(app.buttons["Save"].waitForExistence(timeout:30) || app.buttons["Move"].waitForExistence(timeout:10))
+            XCTAssertFalse(app.buttons["Photos"].exists,"\(title) must use Files directly")
+            savePhoneFile(app,name:"BraidArt-iPhone-Test-\(UUID().uuidString.prefix(8)).\(suffix)")
+            expectStatus(app,"Saved to Files.")
+        }
+        screenshot("iPhone PDF GLB USDZ Files exports completed")
+    }
+    @MainActor private func launchPhoneFixture()->XCUIApplication {
+        let app=XCUIApplication()
+        app.launchArguments=["-hasShownFirstLaunchHelp","YES","--ui-fixture","-AppleLanguages","(en)","-AppleLocale","en_US"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        let weave=app.buttons["weave"]
+        XCTAssertTrue(weave.waitForExistence(timeout:20))
+        expectation(for:NSPredicate(format:"enabled == true"),evaluatedWith:weave)
+        waitForExpectations(timeout:30)
+        return app
+    }
+    @MainActor private func weavePhoneFixture(_ app:XCUIApplication) {
+        app.buttons["weave"].tap()
+        XCTAssertTrue(app.scrollViews["resultCanvas"].waitForExistence(timeout:90))
+        // Continued-processing completion briefly covers the navigation bar on
+        // phones without a Dynamic Island. Wait for the system banner to leave.
+        let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
+        let banner=springboard.descendants(matching:.any).matching(NSPredicate(format:"label CONTAINS %@","Weaving image")).firstMatch
+        if banner.waitForExistence(timeout:2) {
+            expectation(for:NSPredicate(format:"exists == false"),evaluatedWith:banner)
+            waitForExpectations(timeout:20)
+        }
+    }
+    @MainActor private func rotatePhone(_ app:XCUIApplication,to orientation:UIDeviceOrientation,landscape:Bool) {
+        XCUIDevice.shared.orientation=orientation
+        let predicate=NSPredicate { _,_ in landscape ? app.frame.width>app.frame.height : app.frame.height>app.frame.width }
+        expectation(for:predicate,evaluatedWith:app)
+        waitForExpectations(timeout:10)
+        XCTAssertTrue(app.tabBars.firstMatch.buttons["Settings"].isHittable)
+    }
+    @MainActor private func expectStatus(_ app:XCUIApplication,_ message:String) {
+        expectation(for:NSPredicate(format:"label == %@",message),evaluatedWith:app.staticTexts["status"])
+        waitForExpectations(timeout:30)
+    }
+    @MainActor private func savePhoneFile(_ app:XCUIApplication,name:String) {
+        let save=app.buttons["Save"]
+        XCTAssertTrue(save.waitForExistence(timeout:30) || app.buttons["Move"].waitForExistence(timeout:5))
+        screenshot("iPhone standard Files save dialog")
+        let filename=app.textFields.firstMatch
+        if filename.exists {
+            filename.tap()
+            filename.press(forDuration:1)
+            if app.menuItems["Select All"].waitForExistence(timeout:2) { app.menuItems["Select All"].tap() }
+            filename.typeText(name)
+            if app.keyboards.buttons["Done"].exists { app.keyboards.buttons["Done"].tap() }
+        }
+        XCTAssertTrue(save.isEnabled,app.debugDescription)
+        save.tap()
+    }
+    @MainActor
     func testIPadWeaveZoomRotateAndSaveChoices() throws {
         continueAfterFailure=false
         let app=XCUIApplication();app.launchArguments=["-hasShownFirstLaunchHelp","YES","--ui-fixture","-AppleLanguages","(en)","-AppleLocale","en_US"]
@@ -181,7 +365,7 @@ final class MobileUITests:XCTestCase {
         let trace=status.value as? String ?? ""
         XCTAssertTrue(trace.contains("pausedPart=1 completed=1"),trace)
         XCTAssertTrue(trace.contains("continued=true"),"Extended runtime was not granted: \(trace)")
-        screenshot("iPad resumed at next partition after extended background runtime")
+        screenshot("Resumed at next partition after extended background runtime")
         app.buttons["Cancel"].tap()
         XCTAssertTrue(weave.waitForExistence(timeout:10))
     }
