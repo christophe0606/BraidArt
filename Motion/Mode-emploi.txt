@@ -1,0 +1,68 @@
+BRAIDART — DOCUMENT MOTION 3D
+
+Ouvrir BraidArt-3D.motn dans Motion, puis enregistrer une copie pour chaque création.
+Projet : 1920 × 1080, 25 images/s, durée 10 secondes.
+
+IMPORTER UN TRESSAGE
+
+1. Sélectionner le groupe « USDZ — importer ici » dans la liste des calques.
+2. Utiliser Fichier > Importer, ou faire glisser le fichier .usdz dans ce groupe.
+3. Dans Inspecteur > Objet 3D, conserver Taille d’unité : Automatique.
+4. Dans Propriétés, conserver Position X/Y/Z = 0, Rotation X/Y/Z = 0,
+   Échelle = 100 %. Le groupe parent doit aussi conserver ses transformations.
+5. Dans le menu de caméra du canevas, conserver « Caméra active ».
+
+La caméra « BraidArt — Perspective » est activée à l’ouverture. Elle reprend
+l’orientation du bouton Perspective de BraidArt : lacet -0,35 radian, tangage
+-0,35 radian. Les angles de rotation de la caméra Motion sont donc X = +20,0535°,
+Y = -20,0535°, Z = 0°, et elle vise le centre de l’objet.
+
+PASSER À LA VUE DE FACE
+
+Décocher « BraidArt — Perspective » et cocher « BraidArt — Face ».
+Ne conserver qu’une de ces deux caméras activée pour que le rendu exporté
+corresponde à la vue attendue. Les deux caméras utilisent une projection
+perspective, comme BraidArt, y compris la caméra nommée Face.
+
+ÉCLAIRAGE
+
+Trois lumières sont déjà placées : Principale, Remplissage et Ambiance.
+Les orientations des lumières directionnelles reprennent celles de BraidArt ;
+leurs intensités de départ sont 160 %, 50 % et 45 %.
+Les moteurs de rendu de Motion et SceneKit sont différents : matériaux,
+environnement et exposition peuvent donner un aspect différent malgré une
+caméra équivalente. Ajuster au besoin l’éclairage d’environnement de l’objet 3D
+si les reflets masquent les couleurs du tressage.
+
+CADRAGE ET CALIBRATION
+
+BraidArt utilise un champ de vision VERTICAL de 38°. Motion utilise ici un
+angle HORIZONTAL : le document est réglé à 62,9447667248532°, équivalent à 38°
+verticalement pour une composition 16:9. Si le rapport largeur/hauteur du projet
+change, cet angle doit être recalculé :
+
+  angle horizontal = 2 × atan(tan(19°) × largeur / hauteur)
+
+Motion normalise les objets importés en taille automatique à environ 500 pixels.
+Les caméras sont placées à 841,210627 px du centre, avec la marge de cadrage
+utilisée par BraidArt pour une référence carrée de 80 × 80 tuiles. Ce réglage
+convient comme point de départ aux tressages carrés et en portrait. Un tressage
+très large peut demander de rapprocher la caméra pour remplir davantage l’image.
+Le cadrage exact dépend aussi des marges et des dimensions de la géométrie.
+Pour ajuster le recul sans changer l’orientation, sélectionner la caméra puis
+utiliser son outil 3D de déplacement avant/arrière dans le canevas.
+
+Ce document reprend les vues prédéfinies Face/Ajuster et Perspective. Il ne lit
+pas les déplacements, zooms et panoramiques personnalisés d’un projet .braidart.
+Un export USDZ de BraidArt contient la géométrie et les matériaux ; les caméras
+sont définies par ce document Motion.
+
+Origine : document original créé à partir d’une composition Motion vierge.
+Réglages de référence : Sources/BraidCore/BraidScene.swift dans BraidArt.
+Vérifié avec Motion 6.4 : ouverture, deux caméras, trois lumières et import
+réussi d’un USDZ BraidArt. Le fichier fourni reste vierge de média importé.
+
+Documentation Apple :
+https://support.apple.com/guide/motion/camera-controls-motn17c68cdf/mac
+https://support.apple.com/guide/motion/modify-a-3d-objects-inherent-size-and-orientation-motn0e41f019/mac
+https://support.apple.com/guide/motion/work-with-multiple-cameras-motna89c148f/mac
