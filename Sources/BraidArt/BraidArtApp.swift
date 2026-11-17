@@ -11,6 +11,9 @@ struct BraidArtApp: App {
             ContentView(model:model)
                 .frame(minWidth:1050,minHeight:720)
                 .onOpenURL { model.open(url:$0) }
+                .task {
+                    FirstLaunchHelp.showIfNeeded { delegate.showHelp(nil) }
+                }
         }
         .defaultSize(width:1320,height:900)
         .commands {
@@ -38,6 +41,17 @@ struct BraidArtApp: App {
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
+    }
+}
+
+@MainActor
+enum FirstLaunchHelp {
+    static let preferenceKey="hasShownFirstLaunchHelp"
+
+    static func showIfNeeded(defaults:UserDefaults = .standard,showHelp:()->Void) {
+        guard !defaults.bool(forKey:preferenceKey) else { return }
+        defaults.set(true,forKey:preferenceKey)
+        showHelp()
     }
 }
 

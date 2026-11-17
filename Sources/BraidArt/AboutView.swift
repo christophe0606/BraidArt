@@ -26,12 +26,6 @@ struct AboutView: View {
                             Text(L("Copyright © 2026 Christophe Favergeon")).font(.callout)
                         }
                     }
-                    HStack {
-                        Text(L("Licensed under Apache License 2.0.")).font(.callout)
-                        Spacer()
-                        Button(L("License")) { selectedLicense = .project }
-                        Button(L("Notice")) { selectedLicense = .notice }
-                    }
                     Divider()
                     VStack(alignment:.leading,spacing:9) {
                         Text(L("Inspiration")).font(.headline)
@@ -100,7 +94,6 @@ struct AboutView: View {
             }
             Divider()
             HStack {
-                Link(L("BraidArt project"),destination:URL(string:"https://github.com/christophe0606/BraidArt")!)
                 Spacer()
                 Button(L("Done")) { dismissWindow(id:"about") }.keyboardShortcut(.cancelAction)
             }.padding(16)
@@ -154,8 +147,6 @@ private struct AboutLicense: Identifiable {
         candidates.append(root.appendingPathComponent(repository))
         return candidates.first{FileManager.default.fileExists(atPath:$0.path)}
     }
-    static let project=AboutLicense(title:L("BraidArt — Apache License 2.0"),resource:"LICENSE",repository:"LICENSE",origin:URL(string:"https://www.apache.org/licenses/LICENSE-2.0")!)
-    static let notice=AboutLicense(title:L("BraidArt — Notice"),resource:"NOTICE",repository:"NOTICE",origin:URL(string:"https://github.com/christophe0606/BraidArt")!)
     static let inventory=AboutLicense(title:L("Third-party licenses and origins"),resource:"Solver/licenses/README.md",repository:"Licenses/README.md",origin:URL(string:"https://github.com/christophe0606/BraidArt/tree/master/Licenses")!)
     static let bison=AboutLicense(title:L("Bison — Generated parser notice and exception"),resource:"Solver/licenses/Bison/GENERATED-PARSER-NOTICE.txt",repository:"Licenses/Bison/GENERATED-PARSER-NOTICE.txt",origin:URL(string:"https://github.com/coin-or/CoinUtils/blob/releases/2.11.12/CoinUtils/src/CoinModelUseful2.cpp")!)
     static let ampl=AboutLicense(title:L("Lucent — AMPL interface notice"),resource:"Solver/licenses/Cbc/AMPL-NOTICE.txt",repository:"Licenses/Cbc/AMPL-NOTICE.txt",origin:URL(string:"https://github.com/coin-or/Cbc/blob/releases/2.10.13/Cbc/src/Cbc_ampl.cpp")!)

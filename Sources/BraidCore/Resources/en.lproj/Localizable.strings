@@ -47,11 +47,8 @@
 "BraidArt" = "BraidArt";
 "BraidArt Help" = "BraidArt Help";
 "BraidArt app icon" = "BraidArt app icon";
-"BraidArt project" = "BraidArt project";
 "BraidArt reimagines the light, dark and color in your picture as connected strands, creating a new way to see a familiar image." = "BraidArt reimagines the light, dark and color in your picture as connected strands, creating a new way to see a familiar image.";
 "BraidArt transforms photographs and illustrations into patterns of interlacing strands. From a distance, the strands reveal your picture. Up close, they form a world of curves, crossings and loops." = "BraidArt transforms photographs and illustrations into patterns of interlacing strands. From a distance, the strands reveal your picture. Up close, they form a world of curves, crossings and loops.";
-"BraidArt — Apache License 2.0" = "BraidArt — Apache License 2.0";
-"BraidArt — Notice" = "BraidArt — Notice";
 "Brightness" = "Brightness";
 "Broken horizontal strand continuity at (%@, %@)." = "Broken horizontal strand continuity at (%@, %@).";
 "Broken vertical strand continuity at (%@, %@)." = "Broken vertical strand continuity at (%@, %@).";
@@ -188,8 +185,6 @@
 "Invalid sampled image (maximum 256 × 256 tiles)." = "Invalid sampled image (maximum 256 × 256 tiles).";
 "Invalid saved 3D camera." = "Invalid saved 3D camera.";
 "Keep shades" = "Keep shades";
-"License" = "License";
-"Licensed under Apache License 2.0." = "Licensed under Apache License 2.0.";
 "Licenses" = "Licenses";
 "Licenses for %@" = "Licenses for %@";
 "Low" = "Low";
@@ -205,7 +200,6 @@
 "No Help Topics Found" = "No Help Topics Found";
 "No background can meet the selected contrast with these strand colors. Lower Background contrast and extract again." = "No background can meet the selected contrast with these strand colors. Lower Background contrast and extract again.";
 "No diagnostic output." = "No diagnostic output.";
-"Notice" = "Notice";
 "OK" = "OK";
 "One sample becomes one tile. The optimizer matches each tile’s average color to this image." = "One sample becomes one tile. The optimizer matches each tile’s average color to this image.";
 "Open Image or Project…" = "Open Image or Project…";

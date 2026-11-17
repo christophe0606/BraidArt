@@ -179,6 +179,25 @@ swift test --disable-sandbox --scratch-path .build/swift
 open dist/BraidArt.app
 ```
 
+Help opens automatically on the first launch for each macOS user. The app saves
+`hasShownFirstLaunchHelp` in its `org.braidart.mac` preferences. To test the first
+launch again, quit BraidArt, then run from the repository directory:
+
+```sh
+defaults write org.braidart.mac hasShownFirstLaunchHelp -bool false
+open dist/BraidArt.app
+```
+
+Only this flag is reset; other preferences are preserved. After the help opens,
+the flag becomes `true` again. To inspect it:
+
+```sh
+defaults read org.braidart.mac hasShownFirstLaunchHelp
+```
+
+The automatic help also appears once for existing users upgrading from a version
+without this preference. It remains available through **Help → BraidArt Help**.
+
 The solver script verifies pinned SHA-256 checksums, compiles CBC/CLP and their
 COIN-OR dependencies with Apple clang, and installs only under `.build/`. It
 builds static COIN-OR libraries with macOS 14 as the deployment target. Bundle

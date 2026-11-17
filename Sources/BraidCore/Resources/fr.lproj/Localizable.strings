@@ -47,11 +47,8 @@
 "BraidArt" = "BraidArt";
 "BraidArt Help" = "Aide de BraidArt";
 "BraidArt app icon" = "Icône de l’application BraidArt";
-"BraidArt project" = "Projet BraidArt";
 "BraidArt reimagines the light, dark and color in your picture as connected strands, creating a new way to see a familiar image." = "BraidArt réinterprète les zones claires, sombres et colorées de votre image en brins connectés, pour voir autrement une image familière.";
 "BraidArt transforms photographs and illustrations into patterns of interlacing strands. From a distance, the strands reveal your picture. Up close, they form a world of curves, crossings and loops." = "BraidArt transforme les photographies et les illustrations en motifs de brins entrelacés. De loin, les brins révèlent votre image. De près, ils forment un monde de courbes, de croisements et de boucles.";
-"BraidArt — Apache License 2.0" = "BraidArt — Licence Apache 2.0";
-"BraidArt — Notice" = "BraidArt — Notice";
 "Brightness" = "Luminosité";
 "Broken horizontal strand continuity at (%@, %@)." = "La continuité horizontale des brins est rompue en (%@, %@).";
 "Broken vertical strand continuity at (%@, %@)." = "La continuité verticale des brins est rompue en (%@, %@).";
@@ -188,8 +185,6 @@
 "Invalid sampled image (maximum 256 × 256 tiles)." = "L’image échantillonnée est invalide (maximum 256 × 256 tuiles).";
 "Invalid saved 3D camera." = "La caméra 3D enregistrée est invalide.";
 "Keep shades" = "Conserver les nuances";
-"License" = "Licence";
-"Licensed under Apache License 2.0." = "Sous licence Apache 2.0.";
 "Licenses" = "Licences";
 "Licenses for %@" = "Licences de %@";
 "Low" = "Faible";
@@ -205,7 +200,6 @@
 "No Help Topics Found" = "Aucune rubrique d’aide trouvée";
 "No background can meet the selected contrast with these strand colors. Lower Background contrast and extract again." = "Aucun fond ne peut respecter le contraste choisi avec ces couleurs de brins. Réduisez le contraste du fond et relancez l’extraction.";
 "No diagnostic output." = "Aucune sortie de diagnostic.";
-"Notice" = "Notice";
 "OK" = "OK";
 "One sample becomes one tile. The optimizer matches each tile’s average color to this image." = "Un échantillon devient une tuile. L’optimiseur rapproche la couleur moyenne de chaque tuile de celle de cette image.";
 "Open Image or Project…" = "Ouvrir une image ou un projet…";
