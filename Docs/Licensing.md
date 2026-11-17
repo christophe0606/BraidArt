@@ -8,13 +8,18 @@ not replace their licenses or copyright notices.
 
 ## Current integration
 
-The SwiftUI app communicates with the unmodified CBC command-line executable
-through temporary LP and solution files. It does not copy COIN-OR source into
-the Swift/Metal implementation or link COIN-OR libraries into the app executable.
-CBC's own executable incorporates the COIN-OR libraries and keeps their upstream
-licensing. This separation allows BraidArt's original application code to be
-licensed under Apache 2.0 while distributing the solver under its respective
-licenses.
+The SwiftUI app calls CBC in its own process through BraidArt's original C ABI
+bridge in `Native/CBCBridge.cpp`. `libBraidCBC.dylib` dynamically links to the app
+and incorporates the unmodified COIN-OR static libraries. Temporary LP, MIP-start
+and solution files remain the data interface. The bridge uses public interfaces
+and subclasses event handlers; no upstream implementation code is copied into
+BraidArt's Swift, Metal or bridge sources.
+
+BraidArt's original application and bridge code remain Apache 2.0. COIN-OR
+components retain their respective EPL terms; dynamic linking does not relicense
+their implementation under Apache. The EPL's separate-module provisions and
+EPL 2.0's interface/linking exclusion distinguish the application from changes
+to the solver itself. Solver source availability and notices remain required.
 
 The exact solver releases contain EPL 2.0 top-level licenses and EPL 1.0 library
 licenses. Both are preserved with author notices, embedded-code exceptions,
@@ -31,9 +36,12 @@ as well as the separate third-party license inventory. Keep those notices,
 source-availability information and upstream licenses when redistributing the
 bundle. Changes to upstream code must follow that component's own terms.
 
-This scope covers the current separate-executable architecture. Incorporating
-third-party implementation code into BraidArt would require checking the
-licensing of that change.
+There are no upstream solver edits in this integration. `CBC_CHANGES/README.md`
+records this and defines how any future edited upstream copies must be retained
+and distributed. The app includes that directory with its solver notices.
+See [CBC integration](CBCIntegration.md) for threading, cancellation and failure
+behavior. Incorporating third-party implementation code into BraidArt would
+require checking the licensing of that change.
 
 ## Primary references
 

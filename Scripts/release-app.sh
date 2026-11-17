@@ -101,7 +101,7 @@ ditto "$DEV_APP" "$APP"
 
 # Sign inside out. --deep is for verification, never for signing.
 codesign --force --timestamp --options runtime --sign "$IDENTITY" \
-    "$APP/Contents/Resources/Solver/bin/cbc"
+    "$APP/Contents/Frameworks/libBraidCBC.dylib"
 codesign --force --timestamp --options runtime --sign "$IDENTITY" "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 

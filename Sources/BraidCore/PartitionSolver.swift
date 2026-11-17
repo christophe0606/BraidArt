@@ -117,7 +117,7 @@ public enum PartitionSolver {
         // CBC may say 'Optimal (within gap tolerance)': that is feasible, not proven exact.
         return (ids,lower.hasPrefix("optimal") && !lower.contains("gap"),header)
     }
-    public static func solve(image: PixelImage, settings: Settings, executable: URL,
+    public static func solve(image: PixelImage, settings: Settings,
                              progress: @escaping @Sendable (Double,String) async -> Void = {_,_ in}) async throws -> (TileData,SolveResult) {
         try settings.validate();try image.validate();try Task.checkCancellation()
         let started=Date(),data=TileData(settings:settings)
@@ -137,7 +137,7 @@ public enum PartitionSolver {
             let top: [Int]? = r>0 ? (0..<w).map{solution[y-1][x+$0]} : nil
             let problem=try makeProblem(block:Block(x:x,y:y,width:w,height:h),image:image,data:data,costs:costs,left:left,top:top)
             let blockStart=Date()
-            let text=try await CBCRunner.solve(problem:problem,executable:executable,settings:settings)
+            let text=try await CBCRunner.solve(problem:problem,settings:settings)
             let parsed=try parseSolution(text,problem:problem,data:data)
             var objective=0.0
             for yy in 0..<h { for xx in 0..<w {

@@ -412,3 +412,5 @@
 "Drop a photograph, illustration or video here, or choose one. Each sample becomes a connected braid tile." = "Déposez une photo, une illustration ou une vidéo ici, ou choisissez-en une. Chaque échantillon devient une tuile de brins connectés.";
 "Open Image or Video…" = "Ouvrir une image ou une vidéo…";
 "Choose an image or video to begin." = "Choisissez une image ou une vidéo pour commencer.";
+
+"Could not allocate the CBC solver." = "Impossible d’allouer le solveur CBC.";

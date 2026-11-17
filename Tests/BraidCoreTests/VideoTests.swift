@@ -16,7 +16,6 @@ final class VideoTests:XCTestCase {
         settings.crop=CropGeometry.fitted(Crop(),aspectRatio:CropGeometry.normalizedAspectRatio(for:settings.outputSize,imageSize:source.size))
         return settings
     }
-    private func solver() throws -> URL { try XCTUnwrap(CBCRunner.discover(),"Bundled CBC is required for video integration tests") }
     private func timestamps(_ url:URL) async throws -> [Double] {
         let asset=AVURLAsset(url:url)
         let reader=try AVAssetReader(asset:asset)
@@ -50,7 +49,7 @@ final class VideoTests:XCTestCase {
         for format in VideoOutputFormat.allCases {
             let destination=folder.appendingPathComponent("\(format.rawValue).mp4")
             try Data("Old destination".utf8).write(to:destination)
-            let report=try await VideoWeaver.write(source:source,settings:settings,format:format,to:destination,executable:solver())
+            let report=try await VideoWeaver.write(source:source,settings:settings,format:format,to:destination)
             XCTAssertEqual(report.frames,4)
             let output=try await VideoSource.open(url:destination)
             XCTAssertEqual(output.size,CGSize(width:96,height:64));XCTAssertEqual(output.duration,source.duration,accuracy:0.002)
@@ -71,9 +70,9 @@ final class VideoTests:XCTestCase {
         let source=try await VideoSource.open(url:url),settings=try settings(for:source)
         let frame=try await source.frame(at:0)
         let prepared=try ImageProcessor.prepare(image:frame.image,settings:settings)
-        let (data,result)=try await PartitionSolver.solve(image:prepared,settings:settings,executable:solver())
+        let (data,result)=try await PartitionSolver.solve(image:prepared,settings:settings)
         let expected=try ImageProcessor.pixels(from:TileRenderer.render(solution:result.solution,data:data,pixelSize:settings.outputPixelSize))
-        _=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,to:destination,executable:solver())
+        _=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,to:destination)
         let output=try await VideoSource.open(url:destination),actualFrame=try await output.frame(at:0)
         let actual=try ImageProcessor.pixels(from:actualFrame.image)
         let error=zip(expected.pixels,actual.pixels).reduce(0.0) { $0+abs($1.0.r-$1.1.r)+abs($1.0.g-$1.1.g)+abs($1.0.b-$1.1.b) }/Double(expected.pixels.count*3)
@@ -84,7 +83,7 @@ final class VideoTests:XCTestCase {
         reader.add(audioOutput);XCTAssertTrue(reader.startReading())
         XCTAssertNotNil(audioOutput.copyNextSampleBuffer());reader.cancelReading()
         let silent=folder.appendingPathComponent("silent.mp4")
-        _=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,includeAudio:false,to:silent,executable:solver())
+        _=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,includeAudio:false,to:silent)
         let silentTracks=try await AVURLAsset(url:silent).loadTracks(withMediaType:.audio)
         XCTAssertTrue(silentTracks.isEmpty,"Disabling audio must produce a movie with no audio track")
     }
@@ -96,7 +95,7 @@ final class VideoTests:XCTestCase {
         try sentinel.write(to:destination)
         for threshold in [0.12,0.97] {
             let task=Task {
-                try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,to:destination,executable:solver()) { value,_ in
+                try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,to:destination) { value,_ in
                     if value>threshold { withUnsafeCurrentTask { $0?.cancel() } }
                 }
             }
@@ -112,7 +111,7 @@ final class VideoTests:XCTestCase {
         let source=try await VideoSource.open(url:url),before=try Data(contentsOf:url)
         var settings=try settings(for:source)
         do {
-            _=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,to:url,executable:solver())
+            _=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,to:url)
             XCTFail("Must not overwrite source")
         } catch {}
         XCTAssertEqual(try Data(contentsOf:url),before)
@@ -130,7 +129,7 @@ final class VideoTests:XCTestCase {
         let source=try await VideoSource.open(url:url),settings=try settings(for:source)
         for (index,range) in [(0,(0.1,1.1)),(1,(0.3,0.4)),(2,(0.75,1.5))] {
             let segment=try VideoSegment(start:range.0,end:range.1),destination=folder.appendingPathComponent("clip-\(index).mp4")
-            let report=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,segment:segment,to:destination,executable:solver())
+            let report=try await VideoWeaver.write(source:source,settings:settings,format:.mostCompatible,segment:segment,to:destination)
             let actual=try await timestamps(destination)
             let expected = index==0 ? [0,0.15,0.65] : index==1 ? [0] : [0,0.5]
             XCTAssertEqual(report.frames,expected.count);XCTAssertEqual(actual.count,expected.count)
@@ -141,7 +140,7 @@ final class VideoTests:XCTestCase {
             XCTAssertEqual(track.count,1)
             let sourceFrame=try await source.frame(at:segment.start),outputFrame=try await output.frame(at:0)
             let prepared=try ImageProcessor.prepare(image:sourceFrame.image,settings:settings)
-            let (data,result)=try await PartitionSolver.solve(image:prepared,settings:settings,executable:solver())
+            let (data,result)=try await PartitionSolver.solve(image:prepared,settings:settings)
             let rendered=try ImageProcessor.pixels(from:TileRenderer.render(solution:result.solution,data:data,pixelSize:settings.outputPixelSize))
             let pixels=try ImageProcessor.pixels(from:outputFrame.image)
             let error=zip(rendered.pixels,pixels.pixels).reduce(0.0) { $0+abs($1.0.r-$1.1.r)+abs($1.0.g-$1.1.g)+abs($1.0.b-$1.1.b) }/Double(rendered.pixels.count*3)

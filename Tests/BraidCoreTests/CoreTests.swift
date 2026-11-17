@@ -7,9 +7,7 @@ final class CoreTests: XCTestCase {
     func image(_ w:Int=3,_ h:Int=3)->PixelImage {
         PixelImage(width:w,height:h,pixels:(0..<(w*h)).map{ i in RGB(Double((i*37)%101)/100,Double((i*71)%101)/100,Double((i*19)%101)/100)})
     }
-    func solver() throws -> URL {
-        guard let url=CBCRunner.discover() else { throw XCTSkip("Build COIN-OR CBC with Scripts/build-solver.sh") };return url
-    }
+
     func testNotebookTileOrderWeightsAndEdges() throws {
         let d=TileData(settings:Settings())
         XCTAssertEqual(d.allTiles.count,16)
@@ -51,13 +49,13 @@ final class CoreTests: XCTestCase {
         if !gpu.backend.hasPrefix("Metal") {throw XCTSkip("Metal unavailable in this execution environment; CPU fallback verified")}
     }
     func testCBCMatchesBruteForceAndBothSeams() async throws {
-        let executable=try solver(),input=image(2,2)
+        let input=image(2,2)
         var settings=Settings();settings.relativeGap=0;settings.secondsPerPartition=10;settings.threads=1
         let data=TileData(settings:settings),costs=try CostEngine.compute(image:input,tiles:data,useGPU:false)
         // Fixed incoming black/white colors exercise both seams, including their intersection.
         let left=[2,3],top=[2,3]
         let p=try PartitionSolver.makeProblem(block:Block(x:0,y:0,width:2,height:2),image:input,data:data,costs:costs,left:left,top:top)
-        let text=try await CBCRunner.solve(problem:p,executable:executable,settings:settings)
+        let text=try await CBCRunner.solve(problem:p,settings:settings)
         let parsed=try PartitionSolver.parseSolution(text,problem:p,data:data)
         var best=Double.infinity
         for a in data.allTiles where a.left==data.allTiles[left[0]-1].right && a.top==data.allTiles[top[0]-1].bottom {
@@ -75,7 +73,7 @@ final class CoreTests: XCTestCase {
     func testPartitionsRemaindersAndRoundTrip() async throws {
         var settings=Settings();settings.columns=8;settings.partitionSize=2;settings.secondsPerPartition=5;settings.threads=1
         let input=image(5,3)
-        let (data,result)=try await PartitionSolver.solve(image:input,settings:settings,executable:solver())
+        let (data,result)=try await PartitionSolver.solve(image:input,settings:settings)
         XCTAssertEqual(result.solution.count,3);XCTAssertEqual(result.solution[0].count,5);XCTAssertEqual(result.reports.count,6)
         try result.validate(tileData:data)
         XCTAssertEqual(result.reports.map{"\($0.row),\($0.column)"},["0,0","0,1","0,2","1,0","1,1","1,2"])
@@ -258,7 +256,7 @@ final class CoreTests: XCTestCase {
         let input=image(3,3),data=TileData(settings:settings)
         let gpu=try CostEngine.compute(image:input,tiles:data),cpu=try CostEngine.compute(image:input,tiles:data,useGPU:false)
         XCTAssertLessThan(zip(gpu.values,cpu.values).map{abs($0-$1)}.max() ?? 0,0.003)
-        let (_,result)=try await PartitionSolver.solve(image:input,settings:settings,executable:solver())
+        let (_,result)=try await PartitionSolver.solve(image:input,settings:settings)
         XCTAssertEqual(result.reports.count,9);try result.validate(tileData:data)
     }
     func testCBCReadsFiveColorObjectiveAtReaderBufferBoundary() async throws {
@@ -274,7 +272,7 @@ final class CoreTests: XCTestCase {
         let originalLine=data.allTiles.map { String(format:" + %.9f %@",locale:Locale(identifier:"en_US_POSIX"),costs[0,$0.id-1],"x0_\($0.id)") }.joined()
         XCTAssertEqual(originalLine.utf8.count,2046)
         let problem=try PartitionSolver.makeProblem(block:Block(x:0,y:0,width:1,height:1),image:input,data:data,costs:costs)
-        let text=try await CBCRunner.solve(problem:problem,executable:solver(),settings:settings)
+        let text=try await CBCRunner.solve(problem:problem,settings:settings)
         let parsed=try PartitionSolver.parseSolution(text,problem:problem,data:data)
         XCTAssertEqual(parsed.ids.count,1)
         XCTAssertEqual(costs[0,parsed.ids[0]-1],1)
@@ -288,24 +286,10 @@ final class CoreTests: XCTestCase {
         let costs=CostTable(values:Array(repeating:Float(1),count:4*256),tileCount:256,backend:"regression fixture")
         let left=[1,1],top=[1,1]
         let problem=try PartitionSolver.makeProblem(block:Block(x:0,y:0,width:2,height:2),image:input,data:data,costs:costs,left:left,top:top)
-        let text=try await CBCRunner.solve(problem:problem,executable:solver(),settings:settings)
+        let text=try await CBCRunner.solve(problem:problem,settings:settings)
         let parsed=try PartitionSolver.parseSolution(text,problem:problem,data:data)
         XCTAssertEqual(parsed.ids.count,4)
         XCTAssertTrue(parsed.optimal)
-    }
-    func testCancellationStopsChildAndCleansFiles() async throws {
-        let root=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at:root,withIntermediateDirectories:true)
-        defer {try? FileManager.default.removeItem(at:root)}
-        let exe=root.appendingPathComponent("cbc-test")
-        try "#!/bin/sh\nexec /bin/sleep 30\n".write(to:exe,atomically:true,encoding:.utf8)
-        try FileManager.default.setAttributes([.posixPermissions:0o755],ofItemAtPath:exe.path)
-        let input=image(1,1),data=TileData(settings:Settings()),costs=try CostEngine.compute(image:input,tiles:data,useGPU:false)
-        let p=try PartitionSolver.makeProblem(block:Block(x:0,y:0,width:1,height:1),image:input,data:data,costs:costs)
-        let started=Date(),task=Task {try await CBCRunner.solve(problem:p,executable:exe,settings:Settings())}
-        try await Task.sleep(nanoseconds:150_000_000);task.cancel()
-        do { _=try await task.value;XCTFail("Expected cancellation") } catch is CancellationError {} catch {XCTFail("Unexpected error: \(error)")}
-        XCTAssertLessThan(Date().timeIntervalSince(started),2)
     }
 
 }

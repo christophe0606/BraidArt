@@ -40,7 +40,7 @@ public enum VideoWeaver {
     }
     /// Decode and solve one frame at a time. Only the completed movie replaces
     /// the destination; a cancelled or failed run removes its temporary output.
-    public static func write(source:VideoSource,settings:Settings,format:VideoOutputFormat,includeAudio:Bool=true,segment requestedSegment:VideoSegment?=nil,to destination:URL,executable:URL,
+    public static func write(source:VideoSource,settings:Settings,format:VideoOutputFormat,includeAudio:Bool=true,segment requestedSegment:VideoSegment?=nil,to destination:URL,
                              progress:@escaping @Sendable (Double,String) async -> Void = {_,_ in}) async throws -> VideoWeaveReport {
         try validate(settings:settings);try Task.checkCancellation()
         let segment=try requestedSegment ?? VideoSegment(start:0,end:source.duration)
@@ -98,7 +98,7 @@ public enum VideoWeaver {
                 try Task.checkCancellation()
                 let sampled=try autoreleasepool { try ImageProcessor.prepare(image:image,settings:settings) }
                 let frameNumber=count+1
-                let (data,result)=try await PartitionSolver.solve(image:sampled,settings:settings,executable:executable) { fraction,message in
+                let (data,result)=try await PartitionSolver.solve(image:sampled,settings:settings) { fraction,message in
                     let start=max(segment.start,time)
                     let fractionOfMovie=(start-segment.start+fraction*max(0,frameEnd-start))/segment.duration
                     await progress(min(0.95,fractionOfMovie*0.95),L("Frame %@ · %@",String(frameNumber),message))

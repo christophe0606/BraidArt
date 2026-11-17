@@ -106,7 +106,6 @@ final class AppModel: ObservableObject {
     @Published var status=L("Choose an image or video to begin.")
     @Published var progress=0.0
     @Published var error: String?
-    let solverURL=CBCRunner.discover()
     @Published var selectedTab=0
     @Published var paletteCount=6
     @Published var paletteSeparation=PaletteSeparation.medium
@@ -143,7 +142,7 @@ final class AppModel: ObservableObject {
         (videoSource == nil || (!isPlayingVideo && !selectingVideoFrame && preparedFrameID==frameSelectionID))
     }
     var canWeavePicture:Bool {
-        !busy && solverURL != nil && (try? settings.validate()) != nil &&
+        !busy && (try? settings.validate()) != nil &&
         (preparedIsCurrent || (videoSource != nil && !selectingVideoFrame))
     }
     var canWeaveVideo:Bool {
@@ -427,7 +426,7 @@ final class AppModel: ObservableObject {
         if videoSource != nil,!busy,!preparedIsCurrent,let playback=videoPlayback {
             selectVideoFrame(at:playback.pause(notify:false),after:.weave);return
         }
-        guard !busy,preparedIsCurrent,let image=prepared,let executable=solverURL else { return }
+        guard !busy,preparedIsCurrent,let image=prepared else { return }
         resultPreviewTask?.cancel()
         let snapshot=settings,name=sourceName
         activity = .exclusive;progress=0;selectedTab=2;status=L("Starting solver…")
@@ -435,7 +434,7 @@ final class AppModel: ObservableObject {
         task=Task {
             do {
                 let output=try await Task.detached(priority:.userInitiated) {
-                    try await PartitionSolver.solve(image:image,settings:snapshot,executable:executable) { p,message in
+                    try await PartitionSolver.solve(image:image,settings:snapshot) { p,message in
                         await self.update(p,message)
                     }
                 }.valueWithCancellation()
@@ -469,7 +468,7 @@ final class AppModel: ObservableObject {
         startVideoExport(to:url)
     }
     func startVideoExport(to url:URL) {
-        guard canWeaveVideo,let source=videoSource,let segment=videoSegment,let executable=solverURL else { return }
+        guard canWeaveVideo,let source=videoSource,let segment=videoSegment else { return }
         if let playback=videoPlayback { videoFrameTime=playback.pause(notify:false) }
         let snapshot=settings,format=videoFormat,includeAudio=videoIncludeAudio
         let export=ExportProgress(title:L("Weaving video"),filename:url.lastPathComponent,message:L("Preparing video…"))
@@ -477,7 +476,7 @@ final class AppModel: ObservableObject {
         task=Task {
             do {
                 let report=try await Task.detached(priority:.userInitiated) {
-                    try await VideoWeaver.write(source:source,settings:snapshot,format:format,includeAudio:includeAudio,segment:segment,to:url,executable:executable) { value,message in
+                    try await VideoWeaver.write(source:source,settings:snapshot,format:format,includeAudio:includeAudio,segment:segment,to:url) { value,message in
                         await MainActor.run { self.progress=value;self.status=message;export.progress=value;export.message=message }
                     }
                 }.valueWithCancellation()

@@ -12,7 +12,6 @@ struct SidebarState: Equatable {
     let hasCropSelection: Bool
     let preparedSize: CGSize?
     let hasProject: Bool
-    let solverURL: URL?
     let paletteCount: Int
     let paletteSeparation: PaletteSeparation
     let paletteIncludeAccents: Bool
@@ -24,7 +23,7 @@ struct SidebarState: Equatable {
         hasSourceImage=model.sourceImage != nil
         hasCropSelection=model.hasCropSelection
         preparedSize=model.prepared.map { CGSize(width:$0.width,height:$0.height) }
-        hasProject=model.project != nil;solverURL=model.solverURL
+        hasProject=model.project != nil
         paletteCount=model.paletteCount;paletteSeparation=model.paletteSeparation
         paletteIncludeAccents=model.paletteIncludeAccents
         blocksEditing=model.blocksEditing
@@ -121,10 +120,6 @@ struct SettingsSidebar: View, Equatable {
                     }
                     Stepper(L("CPU threads: %@", String(describing: state.settings.threads)),value:binding(\.settings.threads),in:1...16)
                     Text(L("Parts preserve strand colors along their top and left neighbors. Smaller parts solve faster.")).font(.caption).foregroundStyle(.secondary)
-                    if state.solverURL == nil {
-                        Label(L("Bundled solver unavailable"),systemImage:"exclamationmark.triangle").foregroundStyle(.orange)
-                        Text(L("Reinstall BraidArt to restore its bundled solver.")).font(.caption).foregroundStyle(.secondary)
-                    }
                 }
                 section("04", L("Save & export")) {
                     Text(L("%@ × %@ pixels · PNG",String(Int(state.settings.outputPixelSize.width)),String(Int(state.settings.outputPixelSize.height))))

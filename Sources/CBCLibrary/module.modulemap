@@ -1,0 +1,5 @@
+module CBCLibrary [system] {
+    header "BraidCBC.h"
+    link "BraidCBC"
+    export *
+}

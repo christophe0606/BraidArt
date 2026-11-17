@@ -60,7 +60,7 @@ Update `CFBundleShortVersionString` and `CFBundleVersion` in
 
 The script checks your certificate and Keychain authentication before building.
 It runs the normal build, copies the app into a new directory under
-`dist/releases/`, signs the CBC solver and app with Developer ID, Hardened Runtime
+`dist/releases/`, signs the CBC shared library and app with Developer ID, Hardened Runtime
 and secure timestamps, uploads a temporary ZIP to Apple, and waits for acceptance.
 It downloads the notarization log, staples and validates the ticket, checks the
 app's signatures and macOS distribution policy, and creates the final ZIP.
@@ -97,7 +97,7 @@ Nothing extra is required for local development:
 open dist/BraidArt.app
 ```
 
-The build script continues to sign the app and CBC solver **ad hoc** (`codesign
+The build script continues to sign the app and CBC shared library **ad hoc** (`codesign
 --sign -`). These local signatures need no certificate, account or network access
 for signing. They let you run locally built code on your Mac. Opening
 `Package.swift` in Xcode for editing/debugging also remains unchanged.

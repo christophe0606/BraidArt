@@ -200,11 +200,16 @@ without this preference. It remains available through **Help → BraidArt Help**
 
 The solver script verifies pinned SHA-256 checksums, compiles CBC/CLP and their
 COIN-OR dependencies with Apple clang, and installs only under `.build/`. It
-builds static COIN-OR libraries with macOS 14 as the deployment target. Bundle
+builds static COIN-OR libraries and links them into `libBraidCBC.dylib`, with
+macOS 14 as the deployment target. Bundle
 licenses and exact upstream versions are listed in [Docs/ThirdParty.md](Docs/ThirdParty.md).
-Open `Package.swift` in Xcode for editing and debugging. A source-run app finds
-`.build/solver-native/bin/cbc` when its working directory is the repository;
-otherwise set `BRAIDART_CBC` to the executable path for development.
+Open `Package.swift` in Xcode for editing and debugging after building the solver.
+Debug builds load `.build/solver-native/lib/libBraidCBC.dylib`; packaged apps load
+it from `Contents/Frameworks`. CBC executes in the application process with
+cooperative cancellation; no solver executable or Homebrew installation is
+required at runtime. Upstream sources remain unmodified. See
+[the library integration notes](Docs/CBCIntegration.md) for error handling,
+threading and verification.
 `Scripts/build-app.sh` creates
 a standalone Finder bundle with native document opening, menus and local signing.
 

@@ -50,4 +50,17 @@ for SPEC in CoinUtils:2.11.12 Osi:0.108.11 Clp:1.17.11 Cgl:0.60.9 Cbc:2.10.13; d
     popd >/dev/null
     echo "Built $PROJECT $VERSION"
 done
-"$PREFIX/bin/cbc" -stop
+# Link the unmodified static COIN-OR libraries behind BraidArt's small C ABI.
+# Only this shared library is loaded by the app; the upstream CLI is not shipped.
+/usr/bin/clang++ -std=c++17 -O3 -DNDEBUG -dynamiclib -fvisibility=hidden \
+    -mmacosx-version-min=14.0 -I"$PREFIX/include/coin" \
+    "$ROOT/Native/CBCBridge.cpp" -L"$PREFIX/lib" \
+    -lCbcSolver -lCbc -lCgl -lOsiClp -lClpSolver -lClp -lOsi -lCoinUtils -lbz2 -lz -lpthread \
+    -Wl,-install_name,@rpath/libBraidCBC.dylib \
+    -Wl,-exported_symbol,_braid_cbc_create -Wl,-exported_symbol,_braid_cbc_cancel \
+    -Wl,-exported_symbol,_braid_cbc_event_count -Wl,-exported_symbol,_braid_cbc_destroy \
+    -Wl,-exported_symbol,_braid_cbc_search_event_count \
+    -Wl,-exported_symbol,_braid_cbc_solve \
+    -o "$PREFIX/lib/libBraidCBC.dylib"
+codesign --force --sign - "$PREFIX/lib/libBraidCBC.dylib"
+echo "Built $PREFIX/lib/libBraidCBC.dylib"

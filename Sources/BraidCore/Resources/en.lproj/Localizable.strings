@@ -412,3 +412,5 @@
 "Drop a photograph, illustration or video here, or choose one. Each sample becomes a connected braid tile." = "Drop a photograph, illustration or video here, or choose one. Each sample becomes a connected braid tile.";
 "Open Image or Video…" = "Open Image or Video…";
 "Choose an image or video to begin." = "Choose an image or video to begin.";
+
+"Could not allocate the CBC solver." = "Could not allocate the CBC solver.";

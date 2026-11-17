@@ -7,13 +7,15 @@ Apache License, Version 2.0. See LICENSE for the complete license text.
 Separately identified third-party components, notices and reference materials
 retain their respective licenses, copyrights and attribution requirements.
 
-This distribution includes the unmodified COIN-OR CBC solver as a separate
-executable. The solver incorporates CBC 2.10.13, CLP 1.17.11, CoinUtils 2.11.12,
+This distribution includes the unmodified COIN-OR CBC solver in the shared
+library libBraidCBC.dylib, called within the application process. It incorporates CBC 2.10.13, CLP 1.17.11, CoinUtils 2.11.12,
 Osi 0.108.11 and Cgl 0.60.9. These components are not relicensed under Apache 2.0.
 Their upstream releases include EPL 2.0 top-level licenses and EPL 1.0 library
 licenses, retained along with author notices and embedded-code notices in
 Licenses/. Each component's ORIGIN.md gives its exact release, unmodified source
 archive URL and checksum. Licenses/README.md provides the full inventory.
+The original Apache-2.0 library bridge uses public interfaces without modifying
+upstream implementation files. CBC_CHANGES/README.md records upstream-edit policy.
 
 Numerical CIEDE2000 validation data is attributed to Gaurav Sharma, Wencheng Wu
 and Edul N. Dalal; see Licenses/README.md for the original data URL and citation.
