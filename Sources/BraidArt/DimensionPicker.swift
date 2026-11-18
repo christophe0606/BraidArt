@@ -5,9 +5,15 @@ struct DimensionPicker:View {
     let title:String
     @Binding var selection:PictureExportSize
     let customDimensions:[PictureExportSize]
-    var includeViewport=false
     var compact=false
     var onManage:(()->Void)?
+
+    @MainActor static func for3DPicture(model: AppModel, compact: Bool = false) -> Self {
+        Self(title: L("Picture dimensions"),
+             selection: Binding(get: { model.pictureExportSize }, set: { model.pictureExportSize = $0 }),
+             customDimensions: model.customDimensions, compact: compact,
+             onManage: { model.dimensionManagerTarget = .picture })
+    }
 
     private var customChoices:[PictureExportSize] {
         // A project carries its selected custom dimensions even on another Mac,
@@ -35,10 +41,6 @@ struct DimensionPicker:View {
     }
     private var dimensionMenu:some View {
             Picker(title,selection:$selection) {
-                if includeViewport {
-                    Text(PictureExportSize.viewport.title).tag(PictureExportSize.viewport)
-                    Divider()
-                }
                 Section(L("Image dimensions")) {
                     ForEach(PictureExportSize.imageSizes) { size in Text(size.title).tag(size) }
                 }

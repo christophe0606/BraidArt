@@ -1,14 +1,17 @@
 #if os(macOS)
 import SwiftUI
+import PhotosUI
 import UniformTypeIdentifiers
 import BraidCore
 
 struct ContentView: View {
     @ObservedObject var model: AppModel
     @State private var isDropTargeted=false
+    @State private var selectedPhoto: PhotosPickerItem?
     var body: some View {
         HSplitView {
-            SettingsSidebar(model:model,state:SidebarState(model:model)).equatable()
+            SettingsSidebar(model: model, state: SidebarState(model: model),
+                            showsOutputDimensions: model.selectedTab == 0).equatable()
             VStack(spacing:0) {
                 HStack {
                     Picker(L("Workspace"),selection:$model.selectedTab) {
@@ -61,6 +64,12 @@ struct ContentView: View {
         }
         .onChange(of:model.sceneSettings) { _,_ in model.sceneSettingsChanged() }
         .onChange(of:model.settings) { _,_ in model.settingsChanged() }
+        .photosPicker(isPresented: $model.showingPhotoImport, selection: $selectedPhoto, matching: .images)
+        .onChange(of: selectedPhoto) { _, photo in
+            guard let photo else { return }
+            selectedPhoto = nil
+            model.importPhoto(photo)
+        }
         .sheet(item:$model.dimensionManagerTarget) { target in
             DimensionManagerView(model:model,target:target)
         }
@@ -82,8 +91,6 @@ struct ContentView: View {
                 if let image=model.sourceImage {
                     Text(L("SOURCE & CROP")).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                     HStack(spacing:12) {
-                        DimensionPicker(title:L("Output dimensions"),selection:Binding(get:{model.settings.outputSize},set:{model.setOutputSize($0)}),customDimensions:model.customDimensions,onManage:{model.dimensionManagerTarget = .output})
-                            .frame(maxWidth:430)
                         Spacer(minLength:0)
                         Button { model.scaleCrop(by:1/1.1) } label: { Image(systemName:"minus.magnifyingglass") }
                             .help(L("Scale crop down")).accessibilityLabel(L("Scale crop down")).disabled(!model.hasCropSelection)
@@ -196,8 +203,9 @@ struct ContentView: View {
                         Text(L("%@ curves · Metal · drag to rotate, Shift-drag or right-drag to pan, scroll or pinch to zoom", String(describing: braid.curves.count))).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Button(L("Front / Fit")) { model.resetCamera(oblique:false) }
-                    Button(L("Perspective")) { model.resetCamera(oblique:true) }
+                    Button(action: model.resetCamera) {
+                        Label(L("Reset Camera"), systemImage: "arrow.counterclockwise")
+                    }.accessibilityIdentifier("resetCamera")
                 }.padding(20)
                 HStack(spacing:20) {
                     ColorPicker(L("Backing plane"),selection:Binding(get:{model.sceneSettings.planeColor.color},set:{model.sceneSettings.planeColor=RGB(color:$0)}),supportsOpacity:false).frame(maxWidth:230)
@@ -207,15 +215,14 @@ struct ContentView: View {
                     Spacer()
                 }.padding(.horizontal,20).padding(.bottom,16)
                 HStack(spacing:16) {
-                    DimensionPicker(title:L("Picture dimensions"),selection:$model.pictureExportSize,customDimensions:model.customDimensions,includeViewport:true,onManage:{model.dimensionManagerTarget = .picture})
-                        .fixedSize()
+                    DimensionPicker.for3DPicture(model: model).fixedSize()
                     Text(L("The red frame marks the exported area.")).font(.caption).foregroundStyle(.secondary)
                     Spacer(minLength:0)
                 }.padding(.horizontal,20).padding(.bottom,16)
-                if model.resultNeedsWeaving {
+                if model.sculptureNeedsWeaving {
                     Label(L("Showing the previous result. Weave again to apply the current settings."),systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).padding(.bottom,12)
                 }
-                Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,oblique:model.obliqueCamera,camera:model.cameraState,onCameraChanged:model.cameraChanged,onViewReady:model.register3DView)
+                Braid3DView(braid:braid,meshes:model.meshes,generation:model.curveGeneration,settings:model.sceneSettings,reset:model.cameraReset,camera:model.cameraState,onCameraChanged:model.cameraChanged,onViewReady:model.register3DView)
                     .overlay {
                         GeometryReader { proxy in
                             let frame=model.pictureExportSize.frame(in:CGRect(origin:.zero,size:proxy.size))

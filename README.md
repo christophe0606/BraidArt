@@ -40,7 +40,8 @@ The About window links to the [original photograph](https://flic.kr/p/r9qvLn)
 and NASA’s media usage guidelines.
 
 1. Choose **Open Image, Video or Project**, or drag an image or video from Finder onto the
-   main window. Saved projects can also be dropped onto the window. Choose
+   main window. On Mac, use **Open from Photos…** to pick an image from your Photos library.
+   Saved projects can also be dropped onto the window. Choose
    **Output dimensions** (Full HD by default) to set the final woven PNG size and
    its aspect ratio. Opening a picture displays the largest centered crop with
    that ratio. Drag inside the rectangle to move it, or drag any edge
@@ -61,7 +62,8 @@ and NASA’s media usage guidelines.
    Use **Manage Dimensions…** (the sliders button beside either dimensions picker)
    to add a named size, or edit and delete your custom sizes. Built-in sizes are
    locked. Custom sizes are saved across app launches and are available for both
-   woven PNGs and 3D pictures. Deleting a selected custom size selects 1080p Full HD.
+   woven PNGs and 3D pictures. Deleting a selected custom size falls back to Full HD
+   in Prepare or to the Prepare dimensions in 3D.
    Saved projects carry their selected dimensions, so they still open correctly
    on another Mac without your custom-size library.
 2. Start with black and white strands over a gray background, or set a maximum
@@ -104,11 +106,12 @@ and NASA’s media usage guidelines.
    in the 3D view; older projects without a saved camera open in Result.
    The original full-resolution source picture is not embedded.
    All export commands are in **File → Export**, directly below
-   **Save…**. **Result as PNG…** renders at the selected output dimensions.
+   **Save…**. **Result as PNG…** uses the dimensions of the completed weave.
+   Changing **Output dimensions** in Prepare takes effect the next time you weave.
    **Solution and Tile Data…** creates a self-contained folder of JSON, Wolfram data and tile
    PNGs. The export dialog chooses a parent directory and creates a fresh child
    folder without overwriting an earlier export.
-   Its `result.png` uses the same output dimensions. Individual tile PNG sizes
+   Its `result.png` uses the completed weave's dimensions. Individual tile PNG sizes
    are derived from the grid and rounded to whole pixels.
 5. For a video source, the timeline below the source picture has two orange
    handles to trim the segment start/end and a playhead to select a test frame.
@@ -135,19 +138,15 @@ and NASA’s media usage guidelines.
    the video and check a frame to start another video run.
 6. Open **3D** to view continuous, colored tube meshes rendered through Metal.
    Drag to rotate; Shift-drag, right-drag or middle-drag to pan; scroll or pinch
-   to zoom. **Front / Fit** resets the camera; **Perspective** gives an angled
-   view. Set the backing plane color and its clearance from the lowest tube.
-   These settings are retained in the project. Use **Picture dimensions** to
-   select a PNG size. A red rectangle over the 3D view marks exactly the area
-   that will be exported; rotate, pan and zoom to compose inside it. The frame
-   follows the viewport when you resize the window and is not included in the PNG.
-   **File → Export → 3D View as PNG…** saves the
-   current 3D view as a PNG, including its angle, zoom, pan, lighting and backing
-   plane. The size menu and save panel share the same selection: current viewport, HD
-   (1280 × 720), Full HD (1920 × 1080), 4K UHD (3840 × 2160), or Instagram
-   square (1080 × 1080), portrait (1080 × 1350), tall portrait (1080 × 1440),
-   landscape (1080 × 566), and Story (1080 × 1920). Pictures are rendered at the
-   selected resolution after **Save**; a progress window includes **Cancel**.
+   to zoom. **Reset Camera** returns to a centered, front-facing view. Set the
+   backing plane color and its clearance from the lowest tube.
+   These settings are retained in the project. **Picture dimensions** defaults
+   to the current Prepare dimensions. Choose a size in 3D to set its PNG dimensions
+   independently. The red rectangle marks the area that will be exported.
+   Rotate, pan and zoom to compose inside it.
+   **File → Export → 3D View as PNG…** saves that area at the selected resolution,
+   including its angle, zoom, pan, lighting and backing plane. A progress window
+   includes **Cancel**.
    The camera is frozen when you open the export panel, preserving your zoom,
    rotation and pan. A different output aspect ratio crops the visible view
    to the centered red frame without changing the live camera.

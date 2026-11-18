@@ -7,18 +7,29 @@ or later; the Mac app continues to support macOS 14 (Sonoma) or later.
 - iPad: landscape, with a resizable settings sidebar on the left. Drag its handle
   to change its width; the sidebar button in the toolbar hides or restores it.
   Width and visibility are remembered across launches.
-- iPhone: portrait and landscape, with Prepare, Tile Library, Result, 3D and Settings tabs.
-  The French phone tab uses the short label “Tuiles”; the full iPad title and
-  English label remain unchanged. In phone landscape, the 3D controls use one
-  compact row and the gesture reminder is hidden to leave more room for the scene.
+- iPhone: portrait and landscape, with Prepare, Tile Library, Result and 3D tabs.
+  The toolbar above the workspace has Open, Settings and Save & export.
+  Prepare adds Output dimensions, Image width, and Luminance and contrast.
+  Tile Library adds Strand geometry, and 3D adds Picture dimensions.
+  Live controls open in a bottom panel while
+  the toolbar and tab bar are hidden. Drag the panel handle to resize it, scroll
+  its controls or the exposed workspace independently, and tap Close to return.
+  Settings opens the full-screen Tiles & palette and Partition solve controls.
+  Weaving progress appears over the workspace.
+  In phone landscape, the 3D controls use one compact row to leave room for the scene.
 - 3D: drag with one finger to rotate, two fingers to pan, and pinch to zoom.
+  Reset Camera centers the sculpture and restores the front view. Picture
+  dimensions sets the framing and size of the PNG captured from this view.
+  The red frame uses the Prepare dimensions until you choose a size in 3D.
 - Result: pinch to zoom and drag the enlarged picture; Fit resets the view.
+  The PNG retains the completed weave's dimensions. Set the next size in Prepare.
 - Open pictures and videos through the standard Photos picker or Files picker.
 - Pictures and woven videos offer Photos or Files when exported. PDF, GLB, USDZ,
   project and data exports use Files only. Photos access is requested only when
   saving to Photos, and requires add-only access. If permission is refused, the
   completed export remains available through Files. The export toolbar button
-  appears only in Result and 3D, separately from Weave Image.
+  is available from every iPhone tab and from Result and 3D on iPad. Capturing
+  a 3D view as PNG requires the 3D tab.
 - Help opens automatically on the first launch on each device. It remains
   accessible from the information button on later launches. It shares the Mac
   illustrated help, with the

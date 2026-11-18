@@ -149,7 +149,7 @@
 "Fit" = "Ajuster";
 "Focus on what matters" = "Concentrez-vous sur l’essentiel";
 "Free" = "Libre";
-"Front / Fit" = "Face / Ajuster";
+"Reset Camera" = "Réinitialiser la caméra";
 "Full HD — 1920 × 1080" = "Full HD — 1920 × 1080";
 "GPL v2 or later with the upstream output exception" = "GPL v2 ou ultérieure avec l’exception amont relative au code généré";
 "Gaurav Sharma, Wencheng Wu and Edul N. Dalal" = "Gaurav Sharma, Wencheng Wu et Edul N. Dalal";
@@ -227,7 +227,7 @@
 "Partition solve" = "Résolution par parties";
 "Parts preserve strand colors along their top and left neighbors. Smaller parts solve faster." = "Les parties conservent les couleurs des brins de leurs voisines du haut et de gauche. Les petites parties se résolvent plus vite.";
 "Parts proven optimal" = "Optimalité des parties démontrée";
-"Perspective" = "Perspective";
+"Open from Photos…" = "Ouvrir depuis Photos…";
 "Picture" = "Image";
 "Picture dimensions" = "Dimensions de l’image";
 "Picture dimensions must be whole pixels between 1 and 8192." = "Les dimensions de l’image doivent être des nombres entiers de pixels entre 1 et 8192.";
@@ -480,3 +480,7 @@
 "Return to BraidArt to continue." = "Revenez dans BraidArt pour continuer.";
 
 "Tile Library tab" = "Tuiles";
+
+"Image width" = "Largeur de l’image";
+"Luminance and contrast" = "Luminance et contraste";
+"Resize settings panel" = "Redimensionner le panneau de réglages";

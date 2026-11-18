@@ -53,6 +53,27 @@ final class SidebarTests: XCTestCase {
         XCTAssertNil(model.error)
     }
 
+    @MainActor func testImportedPhotoCanBePreparedAfterProviderRemovesItsFile() async throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let source = try XCTUnwrap(HelpIllustration.photograph.url)
+        let providedFile = folder.appendingPathComponent(source.lastPathComponent)
+        try FileManager.default.copyItem(at: source, to: providedFile)
+        var photo: ImportedPhoto? = try ImportedPhoto(copying: providedFile)
+        let localFile = try XCTUnwrap(photo?.url)
+        try FileManager.default.removeItem(at: providedFile)
+
+        let model = AppModel()
+        model.open(url: localFile)
+        try await waitForWork(model)
+        XCTAssertEqual(model.sourceName, source.lastPathComponent)
+        XCTAssertTrue(model.preparedIsCurrent)
+
+        photo = nil
+        XCTAssertFalse(FileManager.default.fileExists(atPath: localFile.path))
+    }
+
     @MainActor func testChangingOnlyPixelDimensionsKeepsCropAndPreparedImageCurrent() async throws {
         let model=AppModel(),url=try XCTUnwrap(HelpIllustration.photograph.url)
         model.open(url:url)

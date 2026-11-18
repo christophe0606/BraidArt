@@ -12,16 +12,18 @@ final class MobileUITests:XCTestCase {
         let tabs=app.tabBars.firstMatch
         for orientation in [UIDeviceOrientation.portrait,.landscapeLeft] {
             XCUIDevice.shared.orientation=orientation
-            for name in ["Préparer","Tuiles","Résultat","3D","Réglages"] {
+            for name in ["Préparer","Tuiles","Résultat","3D"] {
                 XCTAssertTrue(tabs.buttons[name].isHittable,"Missing French phone tab: \(name)")
             }
             XCTAssertFalse(tabs.buttons["Bibliothèque de tuiles"].exists)
+            XCTAssertFalse(tabs.buttons["Réglages"].exists)
+            XCTAssertEqual(app.buttons["phoneSettings"].label, "Réglages")
             tabs.buttons["Tuiles"].tap()
             screenshot(orientation == .portrait ? "iPhone French portrait short tile tab" : "iPhone French landscape short tile tab")
             tabs.buttons["Résultat"].tap()
             XCTAssertTrue(app.buttons["weave"].isHittable)
             XCTAssertTrue(app.buttons["export"].isHittable)
-            XCTAssertGreaterThan(app.buttons["export"].frame.minX-app.buttons["weave"].frame.maxX,0)
+            XCTAssertGreaterThanOrEqual(app.buttons["export"].frame.minY, app.buttons["weave"].frame.maxY)
         }
     }
     @MainActor
@@ -29,19 +31,15 @@ final class MobileUITests:XCTestCase {
         continueAfterFailure=false
         let app=launchPhoneFixture()
         let tabs=app.tabBars.firstMatch
-        for name in ["Prepare","Tile Library","Result","3D","Settings"] {
+        for name in ["Prepare","Tile Library","Result","3D"] {
             XCTAssertTrue(tabs.buttons[name].isHittable,"Missing phone tab: \(name)")
         }
         XCTAssertFalse(app.buttons["sidebarToggle"].exists)
-        XCTAssertFalse(app.buttons["export"].exists)
+        XCTAssertTrue(app.buttons["export"].isHittable)
         screenshot("iPhone portrait prepare")
-        tabs.buttons["Settings"].tap()
-        XCTAssertTrue(app.descendants(matching:.any)["sidebarImageWidth"].firstMatch.waitForExistence(timeout:5))
-        screenshot("iPhone portrait settings tab")
         rotatePhone(app,to:.landscapeLeft,landscape:true)
-        screenshot("iPhone landscape settings tab")
         tabs.buttons["Tile Library"].tap()
-        XCTAssertFalse(app.buttons["export"].exists)
+        XCTAssertTrue(app.buttons["export"].isHittable)
         screenshot("iPhone landscape tile library")
         tabs.buttons["Prepare"].tap()
         XCTAssertTrue(app.buttons["weave"].isHittable)
@@ -75,8 +73,106 @@ final class MobileUITests:XCTestCase {
         XCTAssertNotEqual(portrait,scene.screenshot().pngRepresentation,"The 3D canvas must accept touch after rotation")
         XCTAssertTrue(app.buttons["weave"].isHittable)
         XCTAssertTrue(app.buttons["export"].isHittable)
-        XCTAssertGreaterThan(app.buttons["export"].frame.minX-app.buttons["weave"].frame.maxX,0)
+        XCTAssertGreaterThanOrEqual(app.buttons["export"].frame.minY, app.buttons["weave"].frame.maxY)
         screenshot("iPhone portrait 3D after rotation")
+        let moved=scene.screenshot().pngRepresentation
+        let reset=app.buttons["resetCamera"]
+        XCTAssertTrue(reset.isHittable)
+        XCTAssertFalse(app.buttons["Perspective"].exists)
+        reset.tap()
+        XCTAssertNotEqual(moved,scene.screenshot().pngRepresentation)
+        XCTAssertFalse(app.buttons["outputDimensions"].exists)
+        app.buttons["pictureDimensions"].tap()
+        XCTAssertTrue(app.buttons["Manage Dimensions…"].waitForExistence(timeout:5))
+        app.buttons["closeLiveSettings"].tap()
+    }
+
+    @MainActor
+    func testIPhoneSettingsKeepTheWorkspaceInteractive() throws {
+        continueAfterFailure = false
+        let app = launchPhoneFixture()
+        let tabs = app.tabBars.firstMatch
+        let settings = app.buttons["phoneSettings"]
+        let dismissPanel = app.buttons["closeLiveSettings"]
+        let panel = app.scrollViews["liveSettingsScroll"]
+        let handle = app.descendants(matching: .any)["resizeSettingsPanel"].firstMatch
+        let dimensions = app.buttons["outputDimensions"]
+        let width = app.buttons["imageWidth"]
+        let luminance = app.buttons["luminance"]
+        let geometry = app.buttons["strandGeometry"]
+        XCTAssertTrue(app.buttons["openSettingsMedia"].isHittable)
+        XCTAssertTrue(dimensions.isHittable)
+        XCTAssertTrue(width.isHittable)
+        XCTAssertTrue(luminance.isHittable)
+        XCTAssertFalse(geometry.exists)
+        XCTAssertFalse(tabs.buttons["Settings"].exists)
+
+        settings.tap()
+        let fullSettings = app.scrollViews["phoneSettingsScroll"]
+        XCTAssertTrue(fullSettings.waitForExistence(timeout: 5))
+        XCTAssertTrue(fullSettings.staticTexts["Tiles & palette"].isHittable)
+        let partition = fullSettings.staticTexts["Partition solve"]
+        for _ in 0..<4 where !partition.isHittable { fullSettings.swipeUp() }
+        XCTAssertTrue(partition.isHittable)
+        XCTAssertFalse(fullSettings.sliders["Contrast"].exists)
+        screenshot("iPhone full-screen palette and partition settings")
+        app.buttons["closePhoneSettings"].tap()
+
+        width.tap()
+        XCTAssertTrue(dismissPanel.waitForExistence(timeout: 5))
+        XCTAssertFalse(settings.exists)
+        XCTAssertFalse(tabs.buttons["Prepare"].isHittable)
+        panel.buttons["sidebarImageWidth-Increment"].tap()
+        XCTAssertTrue(panel.staticTexts["10 × 10 = 100 tiles"].waitForExistence(timeout: 10))
+
+        let sample = app.staticTexts["SAMPLED IMAGE"]
+        let sampleY = sample.frame.minY
+        let workspace = app.scrollViews["prepareWorkspace"]
+        let workspaceTitle = workspace.staticTexts["A picture, reimagined as strands."]
+        let contentDrag = workspaceTitle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8))
+        contentDrag.press(forDuration: 0.05, thenDragTo: contentDrag.withOffset(CGVector(dx: 0, dy: -100)))
+        XCTAssertLessThan(sample.frame.minY, sampleY - 30, "The uncovered workspace must scroll")
+        let initialHeight = panel.frame.height
+        let grabber = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        grabber.press(forDuration: 0.05, thenDragTo: grabber.withOffset(CGVector(dx: 0, dy: -115)))
+        XCTAssertGreaterThan(panel.frame.height, initialHeight + 80)
+        screenshot("iPhone resized image width panel with sampled preview")
+        dismissPanel.tap()
+        XCTAssertTrue(tabs.buttons["Prepare"].isHittable)
+
+        dimensions.tap()
+        let manage = app.buttons["Manage Dimensions…"]
+        XCTAssertTrue(manage.waitForExistence(timeout: 5))
+        XCTAssertTrue(manage.isHittable)
+        dismissPanel.tap()
+
+        luminance.tap()
+        XCTAssertTrue(panel.sliders["Contrast"].isHittable)
+        let collapse = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        collapse.press(forDuration: 0.05, thenDragTo: collapse.withOffset(CGVector(dx: 0, dy: 200)))
+        let brightness = panel.sliders["Brightness"]
+        XCTAssertFalse(brightness.isHittable)
+        for _ in 0..<3 where !brightness.isHittable { panel.swipeUp() }
+        XCTAssertTrue(brightness.isHittable, "The overlay controls must scroll independently")
+        dismissPanel.tap()
+
+        tabs.buttons["Tile Library"].tap()
+        XCTAssertFalse(width.exists)
+        XCTAssertFalse(luminance.exists)
+        XCTAssertFalse(dimensions.exists)
+        XCTAssertFalse(app.buttons["pictureDimensions"].exists)
+        geometry.tap()
+        XCTAssertTrue(panel.sliders["Width"].isHittable)
+        rotatePhone(app, to: .landscapeLeft, landscape: true, expectingTabs: false)
+        XCTAssertTrue(dismissPanel.isHittable)
+        XCTAssertTrue(app.scrollViews["tileLibraryWorkspace"].exists)
+        screenshot("iPhone landscape strand geometry panel")
+        dismissPanel.tap()
+        tabs.buttons["Result"].tap()
+        XCTAssertFalse(geometry.exists)
+        XCTAssertFalse(dimensions.exists)
+        XCTAssertFalse(app.buttons["pictureDimensions"].exists)
+        XCTAssertTrue(app.buttons["export"].isHittable)
     }
     @MainActor
     func testIPhone3DPictureExport() throws {
@@ -91,7 +187,7 @@ final class MobileUITests:XCTestCase {
         XCTAssertTrue(app.buttons["Files"].exists)
         app.buttons["Files"].tap()
         savePhoneFile(app,name:"BraidArt-iPhone-3D-Test-\(UUID().uuidString.prefix(8)).png")
-        expectStatus(app,"Saved to Files.")
+        expectExportFinished(app)
         screenshot("iPhone 3D picture exported to Files")
     }
     @MainActor
@@ -112,13 +208,13 @@ final class MobileUITests:XCTestCase {
             XCTAssertTrue(allow.exists,permission.debugDescription)
             allow.tap()
         }
-        expectStatus(app,"Saved to Photos.")
+        expectExportFinished(app)
         screenshot("iPhone picture saved to Photos")
         app.buttons["export"].tap()
         app.buttons["Result as PNG…"].tap()
         app.buttons["Files"].tap()
         savePhoneFile(app,name:"BraidArt-iPhone-Test-\(UUID().uuidString.prefix(8)).png")
-        expectStatus(app,"Saved to Files.")
+        expectExportFinished(app)
         screenshot("iPhone picture saved to Files")
     }
     @MainActor
@@ -132,7 +228,7 @@ final class MobileUITests:XCTestCase {
             XCTAssertTrue(app.buttons["Save"].waitForExistence(timeout:30) || app.buttons["Move"].waitForExistence(timeout:10))
             XCTAssertFalse(app.buttons["Photos"].exists,"\(title) must use Files directly")
             savePhoneFile(app,name:"BraidArt-iPhone-Test-\(UUID().uuidString.prefix(8)).\(suffix)")
-            expectStatus(app,"Saved to Files.")
+            expectExportFinished(app)
         }
         screenshot("iPhone PDF GLB USDZ Files exports completed")
     }
@@ -145,11 +241,14 @@ final class MobileUITests:XCTestCase {
         XCTAssertTrue(weave.waitForExistence(timeout:20))
         expectation(for:NSPredicate(format:"enabled == true"),evaluatedWith:weave)
         waitForExpectations(timeout:30)
+        XCTAssertFalse(app.staticTexts["status"].exists)
         return app
     }
     @MainActor private func weavePhoneFixture(_ app:XCUIApplication) {
         app.buttons["weave"].tap()
         XCTAssertTrue(app.scrollViews["resultCanvas"].waitForExistence(timeout:90))
+        XCTAssertFalse(app.descendants(matching: .any)["phoneRenderingProgress"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["status"].exists)
         // Continued-processing completion briefly covers the navigation bar on
         // phones without a Dynamic Island. Wait for the system banner to leave.
         let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
@@ -159,16 +258,17 @@ final class MobileUITests:XCTestCase {
             waitForExpectations(timeout:20)
         }
     }
-    @MainActor private func rotatePhone(_ app:XCUIApplication,to orientation:UIDeviceOrientation,landscape:Bool) {
+    @MainActor private func rotatePhone(_ app:XCUIApplication,to orientation:UIDeviceOrientation,landscape:Bool,expectingTabs:Bool=true) {
         XCUIDevice.shared.orientation=orientation
         let predicate=NSPredicate { _,_ in landscape ? app.frame.width>app.frame.height : app.frame.height>app.frame.width }
         expectation(for:predicate,evaluatedWith:app)
         waitForExpectations(timeout:10)
-        XCTAssertTrue(app.tabBars.firstMatch.buttons["Settings"].isHittable)
+        XCTAssertEqual(app.tabBars.firstMatch.buttons["Prepare"].isHittable,expectingTabs)
     }
-    @MainActor private func expectStatus(_ app:XCUIApplication,_ message:String) {
-        expectation(for:NSPredicate(format:"label == %@",message),evaluatedWith:app.staticTexts["status"])
-        waitForExpectations(timeout:30)
+    @MainActor private func expectExportFinished(_ app: XCUIApplication) {
+        expectation(for: NSPredicate(format: "hittable == true AND enabled == true"), evaluatedWith: app.buttons["export"])
+        waitForExpectations(timeout: 30)
+        XCTAssertFalse(app.alerts["BraidArt"].exists)
     }
     @MainActor private func savePhoneFile(_ app:XCUIApplication,name:String) {
         let save=app.buttons["Save"]
@@ -200,6 +300,7 @@ final class MobileUITests:XCTestCase {
         weave.tap()
         let result=app.scrollViews["resultCanvas"]
         XCTAssertTrue(result.waitForExistence(timeout:90))
+        XCTAssertFalse(app.descendants(matching:.any)["sidebarOutputDimensions"].firstMatch.exists)
         let before=result.screenshot().pngRepresentation
         result.pinch(withScale:2,velocity:1)
         XCTAssertNotEqual(before,result.screenshot().pngRepresentation)
@@ -207,6 +308,8 @@ final class MobileUITests:XCTestCase {
         app.segmentedControls.buttons["3D"].tap()
         let scene=app.descendants(matching:.any)["sculptureCanvas"].firstMatch
         XCTAssertTrue(scene.waitForExistence(timeout:20))
+        XCTAssertTrue(app.descendants(matching:.any)["pictureDimensionsPicker"].firstMatch.exists)
+        XCTAssertTrue(app.buttons["resetCamera"].isHittable)
         let front=scene.screenshot().pngRepresentation
         scene.coordinate(withNormalizedOffset:CGVector(dx:0.5,dy:0.5)).press(forDuration:0.05,thenDragTo:scene.coordinate(withNormalizedOffset:CGVector(dx:0.7,dy:0.6)))
         XCTAssertNotEqual(front,scene.screenshot().pngRepresentation)
@@ -348,26 +451,35 @@ final class MobileUITests:XCTestCase {
         app.launch()
         let weave=app.buttons["weave"]
         XCTAssertTrue(weave.waitForExistence(timeout:20))
-        expectation(for:NSPredicate(format:"enabled == true"),evaluatedWith:weave)
-        waitForExpectations(timeout:20)
+        let ready = expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: weave)
+        await fulfillment(of: [ready], timeout: 20)
+        let status = app.staticTexts["status"]
+        let usesPhoneOverlay = !status.exists
+        let progress = app.descendants(matching: .any)["phoneRenderingProgress"].firstMatch
+        let traceElement = usesPhoneOverlay ? progress : status
         weave.tap()
-        let status=app.staticTexts["status"]
-        expectation(for:NSPredicate(format:"label CONTAINS %@","Solving part 1 of 2"),evaluatedWith:status)
-        waitForExpectations(timeout:10)
+        let firstPart = expectation(for: NSPredicate(format: "value BEGINSWITH %@", "part=1 "), evaluatedWith: traceElement)
+        await fulfillment(of: [firstPart], timeout: 10)
+        if usesPhoneOverlay {
+            XCTAssertFalse(status.exists)
+            XCTAssertLessThan(progress.frame.maxY, app.tabBars.firstMatch.frame.minY)
+            screenshot("iPhone progress bar over the workspace")
+        }
         XCUIDevice.shared.press(.home)
         // The 40-second partition deliberately exceeds the usual short grace.
         // Waiting longer also proves the second part does not start in background.
         try await Task.sleep(for:.seconds(55))
         app.activate()
-        XCTAssertTrue(status.waitForExistence(timeout:15))
-        expectation(for:NSPredicate(format:"value CONTAINS %@","resumedPart=2"),evaluatedWith:status)
-        waitForExpectations(timeout:15)
-        let trace=status.value as? String ?? ""
+        XCTAssertTrue(traceElement.waitForExistence(timeout:15))
+        let resumed = expectation(for: NSPredicate(format: "value CONTAINS %@", "resumedPart=2"), evaluatedWith: traceElement)
+        await fulfillment(of: [resumed], timeout: 15)
+        let trace=traceElement.value as? String ?? ""
         XCTAssertTrue(trace.contains("pausedPart=1 completed=1"),trace)
         XCTAssertTrue(trace.contains("continued=true"),"Extended runtime was not granted: \(trace)")
         screenshot("Resumed at next partition after extended background runtime")
         app.buttons["Cancel"].tap()
         XCTAssertTrue(weave.waitForExistence(timeout:10))
+        XCTAssertFalse(progress.exists)
     }
     @MainActor private func screenshot(_ name:String) {
         let attachment=XCTAttachment(screenshot:XCUIScreen.main.screenshot());attachment.name=name;attachment.lifetime = .keepAlways;add(attachment)

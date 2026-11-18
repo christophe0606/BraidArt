@@ -10,7 +10,6 @@
 		00CFCEE08125F09EAB4570E7 /* PlatformBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BC31A04BD8EB4F1DAC1A61F /* PlatformBundle.swift */; };
 		032CAF04E8FEED9A299ECB94 /* Export.swift in Sources */ = {isa = PBXBuildFile; fileRef = F540C8A04970CC9D10CEBEEE /* Export.swift */; };
 		04040632E8A598C0008AB928 /* CameraState.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6042392499AF384363FCCE2 /* CameraState.swift */; };
-		04AB76D19CE75F248E0BEFD3 /* PictureExportOptionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 027A9F20398BAC1DCCD2118A /* PictureExportOptionsView.swift */; };
 		0788AB703C34E97AC2AC8A0C /* PictureExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3F29AE82930E9D29BCC81 /* PictureExport.swift */; };
 		0B73F0755AEA885BBCC4D63E /* MobileInfoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 09F7E20FCEC119089B541A27 /* MobileInfoView.swift */; };
 		139D8FCF9F5295FBDAA7A6AF /* MobileFiles.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81122F9240D15C0B00CE8CE6 /* MobileFiles.swift */; };
@@ -60,6 +59,7 @@
 		E31D477A9DADED921839F507 /* ThirdPartyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A9537E2ACC9D78F4DF126C1 /* ThirdPartyTests.swift */; };
 		E37E5CAF8240E0DD2374062D /* BraidArtMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81B7B228B3339FF170709AB6 /* BraidArtMobileApp.swift */; };
 		E3FDD73BBF4ED702BDEE8CD2 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CCF9F31D74EDC3B61CBF704 /* Localization.swift */; };
+		E491636B1EFD54B07579B39B /* PhoneSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE9341CF105B1BFF951F5639 /* PhoneSettings.swift */; };
 		E951F8CBFA48A6076E0A8C6D /* BraidScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8902D9DBCE733982DEED47F5 /* BraidScene.swift */; };
 		EA6532390DF94162E85C946F /* PartitionExecutionControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37C61804BED5F857D9F52B1C /* PartitionExecutionControl.swift */; };
 		EE884659329DF664F32FDE94 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 78FC53B658303C49E8950E42 /* InfoPlist.strings */; };
@@ -107,7 +107,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		027A9F20398BAC1DCCD2118A /* PictureExportOptionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureExportOptionsView.swift; sourceTree = "<group>"; };
 		09F7E20FCEC119089B541A27 /* MobileInfoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileInfoView.swift; sourceTree = "<group>"; };
 		0B1C10DEE488163C4684A1E6 /* BraidArtUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = BraidArtUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1358FE11C1E40651640D39C1 /* MobileContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileContentView.swift; sourceTree = "<group>"; };
@@ -156,6 +155,7 @@
 		C15FD22E22158FD8E5AC2D02 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		C4023DFED637F52DCDEB9921 /* PartitionSolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PartitionSolver.swift; sourceTree = "<group>"; };
 		C7F3F29AE82930E9D29BCC81 /* PictureExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PictureExport.swift; sourceTree = "<group>"; };
+		CE9341CF105B1BFF951F5639 /* PhoneSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneSettings.swift; sourceTree = "<group>"; };
 		D2984E3C05F6296814250707 /* ColorScience.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorScience.swift; sourceTree = "<group>"; };
 		D6042392499AF384363FCCE2 /* CameraState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraState.swift; sourceTree = "<group>"; };
 		D618543E932FEDF11BFC6950 /* SettingsSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSidebar.swift; sourceTree = "<group>"; };
@@ -274,7 +274,6 @@
 				7B09553E6AA98F84D603D7B4 /* ExportProgressView.swift */,
 				17BEF2DE0F8318BF72009059 /* FirstLaunchHelp.swift */,
 				2D67ADC10A6A934F3585EB5D /* HelpView.swift */,
-				027A9F20398BAC1DCCD2118A /* PictureExportOptionsView.swift */,
 				8358C2F34BD80DDD78818D7C /* PlatformImage.swift */,
 				62152A38470AF58702DE3274 /* ProjectFileType.swift */,
 				D618543E932FEDF11BFC6950 /* SettingsSidebar.swift */,
@@ -304,6 +303,7 @@
 				81122F9240D15C0B00CE8CE6 /* MobileFiles.swift */,
 				09F7E20FCEC119089B541A27 /* MobileInfoView.swift */,
 				D8E6AADA0D3C338E5FB7191B /* MobileWeavingLifecycle.swift */,
+				CE9341CF105B1BFF951F5639 /* PhoneSettings.swift */,
 				DB1B2B0D98122FCC8B4D7CD1 /* ZoomableResult.swift */,
 				78FC53B658303C49E8950E42 /* InfoPlist.strings */,
 			);
@@ -542,7 +542,7 @@
 				139D8FCF9F5295FBDAA7A6AF /* MobileFiles.swift in Sources */,
 				0B73F0755AEA885BBCC4D63E /* MobileInfoView.swift in Sources */,
 				72C25441CA5CF7E9125B2F5B /* MobileWeavingLifecycle.swift in Sources */,
-				04AB76D19CE75F248E0BEFD3 /* PictureExportOptionsView.swift in Sources */,
+				E491636B1EFD54B07579B39B /* PhoneSettings.swift in Sources */,
 				9CAAF243A89739B1CA64FEF7 /* PlatformImage.swift in Sources */,
 				A784655481C3995850A7DC18 /* ProjectFileType.swift in Sources */,
 				79AB551163A6A40BD37F33F4 /* SettingsSidebar.swift in Sources */,

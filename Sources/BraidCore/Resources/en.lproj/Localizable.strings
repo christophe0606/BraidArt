@@ -149,7 +149,7 @@
 "Fit" = "Fit";
 "Focus on what matters" = "Focus on what matters";
 "Free" = "Free";
-"Front / Fit" = "Front / Fit";
+"Reset Camera" = "Reset Camera";
 "Full HD — 1920 × 1080" = "Full HD — 1920 × 1080";
 "GPL v2 or later with the upstream output exception" = "GPL v2 or later with the upstream output exception";
 "Gaurav Sharma, Wencheng Wu and Edul N. Dalal" = "Gaurav Sharma, Wencheng Wu and Edul N. Dalal";
@@ -227,7 +227,7 @@
 "Partition solve" = "Partition solve";
 "Parts preserve strand colors along their top and left neighbors. Smaller parts solve faster." = "Parts preserve strand colors along their top and left neighbors. Smaller parts solve faster.";
 "Parts proven optimal" = "Parts proven optimal";
-"Perspective" = "Perspective";
+"Open from Photos…" = "Open from Photos…";
 "Picture" = "Picture";
 "Picture dimensions" = "Picture dimensions";
 "Picture dimensions must be whole pixels between 1 and 8192." = "Picture dimensions must be whole pixels between 1 and 8192.";
@@ -480,3 +480,7 @@
 "Return to BraidArt to continue." = "Return to BraidArt to continue.";
 
 "Tile Library tab" = "Tile Library";
+
+"Image width" = "Image width";
+"Luminance and contrast" = "Luminance and contrast";
+"Resize settings panel" = "Resize settings panel";

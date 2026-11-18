@@ -23,7 +23,7 @@ public enum ProjectExporter {
             let image=try TileRenderer.tile(tile,data:project.tileData,pixelSize:tileSize)
             try ImageProcessor.writePNG(image,to:folder.appendingPathComponent("tiles/\(tileName(tile.id))"))
         }
-        let preview=try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size)
+        let preview=try TileRenderer.render(project)
         try ImageProcessor.writePNG(preview,to:folder.appendingPathComponent("result.png"))
         try ImageProcessor.writePNG(ImageProcessor.cgImage(project.sampledImage),to:folder.appendingPathComponent("sampled-image.png"))
         try wolfram(project).write(to:folder.appendingPathComponent("data.wl"),atomically:true,encoding:.utf8)

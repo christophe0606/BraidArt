@@ -64,8 +64,7 @@ final class DimensionLibraryTests:XCTestCase {
         XCTAssertEqual(model.settings.outputSize,preset);XCTAssertEqual(model.pictureExportSize,preset)
         XCTAssertEqual(model.resultImage?.size,CGSize(width:321,height:517))
         XCTAssertTrue(model.customDimensions.isEmpty,"Opening a project must not recreate a deleted local preset")
-        let options=PictureExportOptions(size:preset,viewport:CGSize(width:1000,height:800),customDimensions:model.customDimensions)
-        XCTAssertEqual(options.pixelSize,CGSize(width:321,height:517))
+        XCTAssertEqual(model.pictureExportSize.pixelSize(viewport:.zero),CGSize(width:321,height:517))
     }
 }
 

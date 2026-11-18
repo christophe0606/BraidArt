@@ -339,7 +339,12 @@ final class CurveTests:XCTestCase {
         restored.display(braid,meshes:meshes,settings:saved.sceneSettings!)
         try restored.restoreCamera(XCTUnwrap(saved.cameraState))
         XCTAssertEqual(restored.cameraState,view.cameraState)
-        XCTAssertTrue(SCNMatrix4EqualToMatrix4(restored.cameraNode.transform,view.cameraNode.transform))
+        let restoredTransform=restored.cameraNode.simdTransform,liveTransform=view.cameraNode.simdTransform
+        for column in 0..<4 {
+            for row in 0..<4 {
+                XCTAssertEqual(restoredTransform[column][row],liveTransform[column][row],accuracy:0.00001)
+            }
+        }
         let before=try view.makePictureCapture(),after=try restored.makePictureCapture()
         let size=PictureExportSize.instagramStory.pixelSize(viewport:view.viewportPixelSize)
         let images=try await Task.detached { (try before.render(size:size),try after.render(size:size)) }.value
@@ -424,6 +429,19 @@ final class CurveTests:XCTestCase {
         let view=BraidMetalView(frame:CGRect(x:0,y:0,width:1000,height:800))
         view.display(braid,meshes:meshes,settings:project.sceneSettings!)
         XCTAssertEqual(view.renderingAPI,.metal);XCTAssertNotNil(view.device)
+        func mouseEvent(_ type: NSEvent.EventType, x: CGFloat, y: CGFloat) throws -> NSEvent {
+            try XCTUnwrap(NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: y), modifierFlags: [],
+                                            timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0,
+                                            clickCount: 1, pressure: 1))
+        }
+        let centered = view.target
+        view.rightMouseDown(with: try mouseEvent(.rightMouseDown, x: 500, y: 400))
+        view.rightMouseDragged(with: try mouseEvent(.rightMouseDragged, x: 530, y: 420))
+        XCTAssertLessThan(view.target.x, centered.x, "A rightward drag moves the camera left")
+        XCTAssertLessThan(view.target.y, centered.y, "An upward drag moves the camera down")
+        view.rightMouseDragged(with: try mouseEvent(.rightMouseDragged, x: 500, y: 400))
+        XCTAssertEqual(view.target.x, centered.x, accuracy: 0.0001)
+        XCTAssertEqual(view.target.y, centered.y, accuracy: 0.0001)
         let initial=view.cameraNode.position
         view.orbit(dx:0.3,dy:-0.35);XCTAssertNotEqual(view.cameraNode.position.x,initial.x)
         let distance=view.cameraDistance;view.zoom(factor:0.8);XCTAssertLessThan(view.cameraDistance,distance)

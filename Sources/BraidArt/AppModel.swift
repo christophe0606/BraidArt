@@ -1,6 +1,8 @@
 import SwiftUI
+import CoreTransferable
 #if os(macOS)
 import AppKit
+import PhotosUI
 #else
 import UIKit
 import Photos
@@ -54,6 +56,30 @@ enum PaletteSeparation: String, CaseIterable, Identifiable {
 enum DimensionSelectionTarget:String,Identifiable {
     case output,picture
     var id:String { rawValue }
+}
+
+/// Owns the local copy of a photo for the lifetime of the editor's source.
+final class ImportedPhoto: Transferable {
+    let url: URL
+
+    init(copying file: URL) throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("BraidImport-\(UUID().uuidString)")
+        let destination = folder.appendingPathComponent(file.lastPathComponent)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.copyItem(at: file, to: destination)
+        } catch {
+            try? FileManager.default.removeItem(at: folder)
+            throw error
+        }
+        url = destination
+    }
+
+    static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(importedContentType: .image) { try ImportedPhoto(copying: $0.file) }
+    }
+
+    deinit { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
 }
 
 private enum PictureInput: @unchecked Sendable {
@@ -127,9 +153,12 @@ final class AppModel: ObservableObject {
     @Published var curveGeneration=0
     @Published var sceneSettings=SceneSettings()
     @Published var cameraReset=0
-    @Published var obliqueCamera=false
     @Published var exportProgress: ExportProgress?
-    @Published var pictureExportSize:PictureExportSize = .viewport
+    @Published private var selectedPictureSize: PictureExportSize?
+    var pictureExportSize: PictureExportSize {
+        get { selectedPictureSize ?? settings.outputSize }
+        set { selectedPictureSize = newValue == .viewport ? nil : newValue }
+    }
     @Published private(set) var customDimensions:[PictureExportSize]=[]
     @Published var dimensionManagerTarget:DimensionSelectionTarget?
     private let defaults:UserDefaults
@@ -137,34 +166,46 @@ final class AppModel: ObservableObject {
     // Camera gestures do not need to invalidate SwiftUI on every mouse movement.
     private(set) var cameraState:CameraState?
     private weak var threeDView:BraidMetalView?
-    private var sourceURL: URL?
-    #if os(iOS) && DEBUG
-    var backgroundWeavingTestValue:String {
-        guard ProcessInfo.processInfo.arguments.contains("--trace-background-weaving") else { return "" }
-        return "pausedPart=\(weavingLifecycle.testPausedPart) completed=\(weavingLifecycle.testCompletedPart) resumedPart=\(weavingLifecycle.testResumedPart) continued=\(weavingLifecycle.testUsedContinued)"
+    private var importedPhoto: ImportedPhoto?
+    private var sourceURL: URL? {
+        didSet { if sourceURL != importedPhoto?.url { importedPhoto = nil } }
     }
-    #endif
     private var weavingState:PartitionExecutionControl.Snapshot?
     private var weavingMessage=""
     #if os(iOS)
+    var isWeaving: Bool { weavingState != nil }
     private lazy var weavingLifecycle=MobileWeavingLifecycle { [weak self] state in
-        self?.weavingState=state
-        self?.refreshWeavingStatus()
+        guard let self else { return }
+        self.weavingState=state
+        self.refreshWeavingStatus()
+        #if DEBUG
+        self.publishBackgroundWeavingTestValue()
+        #endif
     }
+    #if DEBUG
+    @Published private(set) var backgroundWeavingTestValue: String?
+    private static let tracesBackgroundWeaving = ProcessInfo.processInfo.arguments.contains("--trace-background-weaving")
+
+    private func publishBackgroundWeavingTestValue() {
+        guard Self.tracesBackgroundWeaving else { return }
+        let lifecycle = weavingLifecycle
+        let value = "part=\(weavingState?.currentPartition ?? 0) pausedPart=\(lifecycle.testPausedPart) completed=\(lifecycle.testCompletedPart) resumedPart=\(lifecycle.testResumedPart) continued=\(lifecycle.testUsedContinued)"
+        if value != backgroundWeavingTestValue { backgroundWeavingTestValue = value }
+    }
+    #endif
     #endif
     private var task: Task<Void,Never>?
     private var previewTask: Task<Void,Never>?
-    private var resultPreviewTask: Task<Void,Never>?
     private var preparedSettings: BraidCore.Settings?
     private var revision=0
     private var cachedTileData: TileData?
     private var paletteIDs=BraidCore.Settings().palette.map { _ in UUID() }
+    @Published var showingPhotoImport=false
     #if os(macOS)
     private var exportSavePanel: NSSavePanel?
     #else
     @Published var showingImportChoice=false
     @Published var showingFileImport=false
-    @Published var showingPhotoImport=false
     @Published var mobileExport:MobileExportRequest?
     @Published var exportedFile:MobileExportFile?
     private var mobileDestination=MobileExportDestination.files
@@ -190,10 +231,14 @@ final class AppModel: ObservableObject {
         return sourceURL.map(PictureInput.image)
     }
     var resultNeedsWeaving: Bool {
+        guard let project else { return false }
+        return project.settings.outputPixelSize != settings.outputPixelSize || sculptureNeedsWeaving
+    }
+    var sculptureNeedsWeaving: Bool {
         guard var solved=project?.settings else { return false }
         // The threshold affects the next Extract, not an existing weave.
         solved.backgroundMinimumDistance=settings.backgroundMinimumDistance
-        // Pixel dimensions are an export preference; the crop determines the weave.
+        // The crop and sample affect the sculpture. The woven PNG pixel size does not.
         solved.outputSize=settings.outputSize
         return solved != settings
     }
@@ -221,7 +266,7 @@ final class AppModel: ObservableObject {
         let replacement=PictureExportSize.custom(try CustomPictureSize(id:custom.id,name:name,width:width,height:height))
         customDimensions[index]=replacement;saveCustomDimensions()
         if settings.outputSize.id==preset.id { setOutputSize(replacement) }
-        if pictureExportSize.id==preset.id { pictureExportSize=replacement }
+        if selectedPictureSize?.id==preset.id { selectedPictureSize=replacement }
         return replacement
     }
     @discardableResult
@@ -229,7 +274,7 @@ final class AppModel: ObservableObject {
         guard preset.customSize != nil,customDimensions.contains(where:{$0.id==preset.id}) else { return false }
         customDimensions.removeAll { $0.id==preset.id };saveCustomDimensions()
         if settings.outputSize.id==preset.id { setOutputSize(.fullHD) }
-        if pictureExportSize.id==preset.id { pictureExportSize = .fullHD }
+        if selectedPictureSize?.id==preset.id { selectedPictureSize=nil }
         return true
     }
     private func saveCustomDimensions() {
@@ -265,21 +310,47 @@ final class AppModel: ObservableObject {
         let panel=NSOpenPanel();panel.allowedContentTypes=[.image,.movie,.video,.json,.braidArtProject];panel.allowsMultipleSelection=false
         if panel.runModal() == .OK,let url=panel.url { open(url:url) }
     }
-    #endif
-    func open(url: URL) {
+    func choosePhoto() {
         guard !busy else { return }
-        task?.cancel();previewTask?.cancel();resultPreviewTask?.cancel();revision+=1
+        showingPhotoImport = true
+    }
+    func importPhoto(_ item: PhotosPickerItem) {
+        guard beginOpeningSource() else { return }
+        openImage {
+            guard let photo = try await item.loadTransferable(type: ImportedPhoto.self) else {
+                throw BraidError.invalid(L("Cannot open the selected picture or video."))
+            }
+            return (photo.url, photo)
+        }
+    }
+    #endif
+    private func beginOpeningSource() -> Bool {
+        guard !busy else { return false }
+        task?.cancel();previewTask?.cancel();revision+=1
+        return true
+    }
+    func open(url: URL) {
+        guard beginOpeningSource() else { return }
         if url.pathExtension.lowercased()=="braidart" || url.pathExtension.lowercased()=="json" { loadProject(url);return }
         if VideoSource.isVideo(url) { openVideo(url);return }
+        openImage { (url, nil) }
+    }
+    private func openImage(_ load: @escaping () async throws -> (URL, ImportedPhoto?)) {
+        let previousStatus=status
         activity = .exclusive;status=L("Opening image…");let rev=revision
         task=Task {
             do {
-                let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.value
+                let (url, photo)=try await load()
+                try Task.checkCancellation()
+                let image=try await Task.detached { try ImageProcessor.thumbnail(url:url) }.valueWithCancellation()
+                try Task.checkCancellation()
                 guard rev==revision else { return }
                 clearVideoSource()
-                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=image.platformImage;resetCrop()
+                sourceURL=url;importedPhoto=photo;sourceName=url.lastPathComponent;sourceImage=image.platformImage;resetCrop()
                 prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;activity=nil
                 prepare()
+            } catch is CancellationError {
+                activity=nil;status=previousStatus
             } catch { fail(error) }
         }
     }
@@ -367,7 +438,6 @@ final class AppModel: ObservableObject {
         guard preset != .viewport,preset != settings.outputSize else { return }
         let previousRatio=cropAspectRatio
         settings.outputSize=preset
-        refreshResultImage()
         guard sourceImage != nil,previousRatio != cropAspectRatio else { return }
         settings.crop=CropGeometry.fitted(hasCropSelection ? settings.crop : Crop(),aspectRatio:cropAspectRatio)
         hasCropSelection=true
@@ -379,20 +449,6 @@ final class AppModel: ObservableObject {
     func resetCrop() {
         settings.crop=CropGeometry.fitted(Crop(),aspectRatio:cropAspectRatio)
         hasCropSelection=sourceImage != nil
-    }
-    private func refreshResultImage() {
-        resultPreviewTask?.cancel()
-        guard let project else { return }
-        let size=settings.outputPixelSize
-        resultPreviewTask=Task {
-            do {
-                let image=try await Task.detached {
-                    try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size)
-                }.valueWithCancellation()
-                try Task.checkCancellation()
-                resultImage=image.platformImage
-            } catch is CancellationError {} catch { self.error=error.localizedDescription }
-        }
     }
     func refreshTiles() {
         guard (try? settings.validate()) != nil else { return }
@@ -463,7 +519,6 @@ final class AppModel: ObservableObject {
             selectVideoFrame(at:playback.pause(notify:false),after:.weave);return
         }
         guard !busy,preparedIsCurrent,let image=prepared else { return }
-        resultPreviewTask?.cancel()
         let snapshot=settings,name=sourceName
         activity = .exclusive;progress=0;selectedTab=2;status=L("Starting solver…")
         previewTask?.cancel()
@@ -479,7 +534,8 @@ final class AppModel: ObservableObject {
                 }.valueWithCancellation()
                 try Task.checkCancellation()
                 let result=output.1,data=output.0
-                let rendered=try await Task.detached{try TileRenderer.render(solution:result.solution,data:data,pixelSize:snapshot.outputPixelSize)}.value
+                let woven=BraidProject(sourceName:name,settings:snapshot,sampledImage:image,tileData:data,result:result)
+                let rendered=try await Task.detached{try TileRenderer.render(woven)}.value
                 try await execution?.waitUntilForeground()
                 let generated=try await Task.detached { try CurveGenerator.generate(solution:result.solution,data:data) }.value
                 try await execution?.waitUntilForeground()
@@ -487,7 +543,7 @@ final class AppModel: ObservableObject {
                 try await execution?.waitUntilForeground()
                 cameraState=nil;curves=generated;meshes=tubes;curveGeneration+=1
                 sceneSettings=SceneSettings(planeColor:data.background)
-                project=BraidProject(sourceName:name,settings:snapshot,sampledImage:image,tileData:data,result:result)
+                project=woven
                 project?.sceneSettings=sceneSettings
                 if videoSource != nil { checkedVideoSettings=snapshot;checkedFrameTime=videoFrameTime }
                 resultImage=rendered.platformImage;zoom=1;activity=nil;progress=1
@@ -580,8 +636,8 @@ final class AppModel: ObservableObject {
         // This is an extraction preference, so saving it does not replace the
         // colors or geometry associated with the existing woven result.
         saved.settings.backgroundMinimumDistance=settings.backgroundMinimumDistance
-        saved.settings.outputSize=settings.outputSize
-        saved.sceneSettings=sceneSettings;saved.cameraState=cameraState;saved.pictureExportSize=pictureExportSize
+        saved.nextOutputSize=settings.outputSize == saved.settings.outputSize ? nil : settings.outputSize
+        saved.sceneSettings=sceneSettings;saved.cameraState=cameraState;saved.pictureExportSize=selectedPictureSize
         return saved
     }
     private func loadProject(_ url: URL) {
@@ -589,14 +645,16 @@ final class AppModel: ObservableObject {
         task=Task {
             do {
                 let loaded=try await Task.detached { try BraidProject.load(from:url) }.value
-                let rendered=try await Task.detached{try TileRenderer.render(solution:loaded.result.solution,data:loaded.tileData,pixelSize:loaded.settings.outputPixelSize)}.value
+                let rendered=try await Task.detached{try TileRenderer.render(loaded)}.value
                 let generated=try await Task.detached { try CurveGenerator.generate(solution:loaded.result.solution,data:loaded.tileData) }.value
                 let tubes=try await Task.detached { try TubeMesher.build(generated) }.value
                 curves=generated;meshes=tubes;curveGeneration+=1
                 sceneSettings=loaded.sceneSettings ?? SceneSettings(planeColor:loaded.tileData.background)
-                cameraState=loaded.cameraState;pictureExportSize=loaded.pictureExportSize ?? .viewport
+                cameraState=loaded.cameraState
+                selectedPictureSize=loaded.pictureExportSize == .viewport ? nil : loaded.pictureExportSize
                 paletteIDs=loaded.settings.palette.map { _ in UUID() }
                 clearVideoSource();sourceURL=nil;sourceImage=nil;sourceName=loaded.sourceName;settings=loaded.settings
+                if let nextSize=loaded.nextOutputSize { settings.outputSize=nextSize }
                 hasCropSelection=loaded.settings.crop != Crop()
                 prepared=loaded.sampledImage;preparedSettings=loaded.settings;preparedImage=try ImageProcessor.cgImage(loaded.sampledImage).platformImage
                 project=loaded;resultImage=rendered.platformImage;refreshTiles();selectedTab=loaded.cameraState == nil ? 2 : 3;activity=nil
@@ -609,10 +667,10 @@ final class AppModel: ObservableObject {
         guard let project=project,!busy else { return }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-braid.png";panel.allowedContentTypes=[.png]
         guard panel.runModal() == .OK,let url=panel.url else { return }
-        let size=settings.outputPixelSize;activity = .exclusive;status=L("Exporting PNG…")
+        activity = .exclusive;status=L("Exporting PNG…")
         task=Task {
             do {
-                try await Task.detached { let cg=try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size);try ImageProcessor.writePNG(cg,to:url) }.value
+                try await Task.detached { try ImageProcessor.writePNG(TileRenderer.render(project),to:url) }.value
                 activity=nil;status=L("Saved %@", String(describing: url.lastPathComponent))
             } catch { fail(error) }
         }
@@ -636,39 +694,37 @@ final class AppModel: ObservableObject {
     }
     #endif
     func sceneSettingsChanged() { project?.sceneSettings=sceneSettings }
-    func resetCamera(oblique:Bool) { obliqueCamera=oblique;cameraReset+=1 }
+    func resetCamera() {
+        cameraState=nil
+        cameraReset+=1
+    }
     func cameraChanged(_ state:CameraState) { cameraState=state }
     func register3DView(_ view:BraidMetalView) { threeDView=view }
     #if os(macOS)
     func export3DPicture() {
         guard !busy,exportSavePanel == nil,selectedTab==3,curves != nil,let view=threeDView,let window=view.window else { return }
         let capture:BraidPictureCapture
-        do { capture=try view.makePictureCapture() }
+        let size=pictureExportSize.pixelSize(viewport:.zero)
+        do { capture=try view.makePictureCapture(size:size) }
         catch { fail(error);return }
-        let options=PictureExportOptions(size:pictureExportSize,viewport:view.viewportPixelSize,customDimensions:customDimensions) { [weak self] size in
-            self?.pictureExportSize=size
-        }
         let panel=NSSavePanel();panel.nameFieldStringValue="\(baseName)-3d.png";panel.allowedContentTypes=[.png]
-        panel.message=L("Export the current 3D picture.")
-        let accessory=NSHostingView(rootView:PictureExportOptionsView(options:options))
-        accessory.setFrameSize(accessory.fittingSize);panel.accessoryView=accessory
+        panel.message=L("%@ × %@ pixels · PNG",String(Int(size.width)),String(Int(size.height)))
         exportSavePanel=panel
         panel.beginSheetModal(for:window) { [weak self] response in
             guard let self else { return }
             self.exportSavePanel=nil
             guard response == .OK,let url=panel.url,!self.busy else { return }
-            self.pictureExportSize=options.size
-            self.startPictureExport(capture,size:options.pixelSize,to:url)
+            self.startPictureExport(capture,to:url)
         }
     }
     #endif
-    private func startPictureExport(_ capture:BraidPictureCapture,size:CGSize,to url:URL) {
+    private func startPictureExport(_ capture:BraidPictureCapture,to url:URL) {
         let export=ExportProgress(title:L("Exporting 3D Picture"),filename:url.lastPathComponent,message:L("Rendering 3D picture…"))
         activity = .exclusive;progress=0;status=L("Exporting 3D picture…");exportProgress=export
         task=Task {
             do {
                 try await Task.detached(priority:.userInitiated) {
-                    let image=try capture.render(size:size)
+                    let image=try capture.render()
                     try Task.checkCancellation()
                     DispatchQueue.main.async {
                         guard !export.cancelling else { return }
@@ -862,11 +918,9 @@ extension AppModel {
     }
     func exportPNG() {
         guard let project else { return }
-        let size=settings.outputPixelSize
         requestMobileExport("\(baseName)-braid.png",photos:true) { url in
             self.mobileRunExport(url) {
-                let cg=try TileRenderer.render(solution:project.result.solution,data:project.tileData,pixelSize:size)
-                try ImageProcessor.writePNG(cg,to:url)
+                try ImageProcessor.writePNG(TileRenderer.render(project),to:url)
             }
         }
     }
@@ -877,9 +931,8 @@ extension AppModel {
     func export3DPicture() {
         guard !busy,selectedTab==3,let view=threeDView else { return }
         do {
-            let capture=try view.makePictureCapture()
-            let size=pictureExportSize.pixelSize(viewport:view.viewportPixelSize)
-            requestMobileExport("\(baseName)-3d.png",photos:true) { self.startPictureExport(capture,size:size,to:$0) }
+            let capture=try view.makePictureCapture(size:pictureExportSize.pixelSize(viewport:.zero))
+            requestMobileExport("\(baseName)-3d.png",photos:true) { self.startPictureExport(capture,to:$0) }
         } catch { fail(error) }
     }
     func exportPDF() {

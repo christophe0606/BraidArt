@@ -200,6 +200,8 @@ public struct BraidProject: Codable, Sendable {
     public var sceneSettings: SceneSettings? = nil
     public var cameraState: CameraState? = nil
     public var pictureExportSize: PictureExportSize? = nil
+    /// A pending output selection for the editor. The woven result uses settings.outputSize.
+    public var nextOutputSize: PictureExportSize? = nil
     public var formatVersion = 1
     public var createdAt = Date()
     public var sourceName: String
@@ -213,6 +215,7 @@ public struct BraidProject: Codable, Sendable {
     public func validate() throws {
         guard formatVersion == 1 else { throw BraidError.invalid(L("Unsupported project format version.")) }
         try settings.validate(); try sampledImage.validate(); try sceneSettings?.validate(); try cameraState?.validate()
+        guard nextOutputSize != .viewport else { throw BraidError.invalid(L("Invalid image, palette, geometry, or solver settings.")) }
         guard tileData == TileData(settings: settings), sampledImage.width == result.solution.first?.count,
               sampledImage.height == result.solution.count else { throw BraidError.invalid(L("Project tile data does not match its settings or sampled image.")) }
         try result.validate(tileData: tileData)

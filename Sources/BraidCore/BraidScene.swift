@@ -45,6 +45,7 @@ public enum BraidScene {
 
 /// SceneKit rasterizes real tube meshes with Metal. Camera controls are explicit and deterministic.
 public final class BraidMetalView: SCNView {
+    private static let defaultFieldOfView: CGFloat = 38
     public private(set) var cameraNode=SCNNode()
     public private(set) var target=SCNVector3Zero
     public private(set) var orbitYaw:Float=0
@@ -86,7 +87,7 @@ public final class BraidMetalView: SCNView {
         super.init(frame:frame,options:[SCNView.Option.preferredRenderingAPI.rawValue:SCNRenderingAPI.metal.rawValue])
         antialiasingMode = .multisampling4X
         autoenablesDefaultLighting=false;allowsCameraControl=false
-        cameraNode.camera=SCNCamera();cameraNode.camera!.fieldOfView=38
+        cameraNode.camera=SCNCamera();cameraNode.camera!.fieldOfView=Self.defaultFieldOfView
         cameraNode.camera!.projectionDirection = .vertical
         cameraNode.camera!.wantsHDR=true;cameraNode.camera!.wantsExposureAdaptation=false
         cameraNode.camera!.exposureOffset = -0.35
@@ -167,18 +168,21 @@ public final class BraidMetalView: SCNView {
         pendingFit=nil
         #endif
         let aspect=Float(max(1,bounds.width)/max(1,bounds.height))
-        fitDistance=max(Float(rows),Float(columns)/aspect)*0.5/tan(38*Float.pi/360)*1.15+1
+        cameraNode.camera!.fieldOfView=Self.defaultFieldOfView
+        fitDistance=max(Float(rows),Float(columns)/aspect)*0.5/tan(Float(Self.defaultFieldOfView)*Float.pi/360)*1.15+1
         cameraDistance=fitDistance;orbitYaw=oblique ? -0.35 : 0;orbitPitch=oblique ? -0.35 : 0
         target=SCNVector3(Float(columns)/2+0.5,-Float(rows)/2-0.5,0);updateCamera()
     }
     public func orbit(dx:Float,dy:Float) { orbitYaw += dx;orbitPitch=min(1.45,max(-1.45,orbitPitch+dy));updateCamera() }
     public func zoom(factor:Float) { cameraDistance=min(fitDistance*15,max(0.5,cameraDistance*factor));updateCamera() }
+    /// Pan by a screen-space delta, with positive x to the right and positive y up.
     public func pan(dx:Float,dy:Float) {
         let scale=cameraDistance*0.001
         let transform=cameraNode.simdWorldTransform
-        target.x += .init((-dx*transform.columns.0.x+dy*transform.columns.1.x)*scale)
-        target.y += .init((-dx*transform.columns.0.y+dy*transform.columns.1.y)*scale)
-        target.z += .init((-dx*transform.columns.0.z+dy*transform.columns.1.z)*scale)
+        let offset = (-dx * transform.columns.0 - dy * transform.columns.1) * scale
+        target.x += SceneScalar(offset.x)
+        target.y += SceneScalar(offset.y)
+        target.z += SceneScalar(offset.z)
         updateCamera()
     }
     private func updateCamera() {

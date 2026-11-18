@@ -22,6 +22,7 @@ struct BraidArtApp: App {
             HelpMenuCommands(showHelp:{ delegate.showHelp(nil) })
             CommandGroup(replacing:.newItem) {
                 Button(L("Open…")) { model.chooseImage() }.keyboardShortcut("o").disabled(model.busy)
+                Button(L("Open from Photos…"), action: model.choosePhoto).disabled(model.busy)
             }
             CommandGroup(replacing:.saveItem) {
                 Divider()

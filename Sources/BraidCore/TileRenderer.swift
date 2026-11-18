@@ -50,6 +50,10 @@ public enum TileRenderer {
         }
         return try makeImage(bytes:bytes,width:width,height:height)
     }
+    public static func render(_ project: BraidProject) throws -> CGImage {
+        try render(solution: project.result.solution, data: project.tileData, pixelSize: project.settings.outputPixelSize)
+    }
+
     /// Sample directly at the requested dimensions, including fractional tile sizes.
     /// Rounding the size of each tile first would change the final image dimensions.
     public static func render(solution:[[Int]],data:TileData,pixelSize:CGSize) throws -> CGImage {

@@ -38,6 +38,7 @@ final class MobileTests:XCTestCase {
     func testNativeSolverAndPictureDestinationChoice() async throws {
         let model=try await wovenModel()
         try model.project!.result.validate(tileData:model.project!.tileData)
+        model.setOutputSize(.custom(try CustomPictureSize(name:"Next",width:192,height:96)))
         model.exportPNG()
         let request=try XCTUnwrap(model.mobileExport)
         XCTAssertTrue(request.allowsPhotos)
@@ -127,6 +128,12 @@ final class MobileTests:XCTestCase {
         XCTAssertTrue(pans.contains { $0.minimumNumberOfTouches==2 && $0.maximumNumberOfTouches==2 })
         XCTAssertEqual(view.gestureRecognizers?.filter { $0 is UIPinchGestureRecognizer && $0.isEnabled }.count,1)
         let initial=view.cameraState
+        view.pan(dx: 80, dy: 30)
+        XCTAssertLessThan(view.cameraState.target.x, initial.target.x)
+        XCTAssertLessThan(view.cameraState.target.y, initial.target.y)
+        view.pan(dx: -80, dy: -30)
+        XCTAssertEqual(view.cameraState.target.x, initial.target.x, accuracy: 0.0001)
+        XCTAssertEqual(view.cameraState.target.y, initial.target.y, accuracy: 0.0001)
         view.orbit(dx:0.2,dy:0.1)
         XCTAssertNotEqual(view.cameraState.orbitYaw,initial.orbitYaw)
         view.pan(dx:80,dy:30)
@@ -135,9 +142,26 @@ final class MobileTests:XCTestCase {
         view.zoom(factor:0.5)
         XCTAssertEqual(view.cameraState.cameraDistance,initial.cameraDistance/2,accuracy:0.01)
         let before=view.cameraState
-        let capture=try view.makePictureCapture()
-        let picture=try await Task.detached { try capture.render(size:CGSize(width:320,height:180)) }.value
+        XCTAssertEqual(model.pictureExportSize,model.settings.outputSize)
+        model.pictureExportSize = .custom(try CustomPictureSize(name:"Capture",width:320,height:180))
+        model.selectedTab=3
+        model.register3DView(view)
+        model.export3DPicture()
+        let request=try XCTUnwrap(model.mobileExport)
+        request.start(.files)
+        let url=try await completedFile(model)
+        let picture=try XCTUnwrap(UIImage(contentsOfFile:url.path)?.cgImage)
         XCTAssertEqual(picture.width,320);XCTAssertEqual(picture.height,180)
+        model.finishFileExport(false)
         XCTAssertEqual(view.cameraState,before)
+        var adjusted=before
+        adjusted.fieldOfView=60
+        try view.restoreCamera(adjusted)
+        model.cameraChanged(adjusted)
+        model.resetCamera()
+        XCTAssertNil(model.cameraState)
+        let braid=try XCTUnwrap(model.curves)
+        view.fit(columns:braid.columns,rows:braid.rows)
+        XCTAssertEqual(view.cameraState,initial)
     }
 }
