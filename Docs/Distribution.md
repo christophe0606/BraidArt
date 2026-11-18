@@ -1,4 +1,49 @@
-# macOS builds and distribution
+# BraidArt builds and distribution
+
+## App Store Connect releases
+
+From the repository root, run one command for both platforms:
+
+```sh
+./Scripts/release-app-store.sh 1.1.0 7
+```
+
+Replace the example with your release version and a higher build number for
+each new upload. When you omit the numbers, both builds use the version and
+build from `Resources/Info.plist`. The command prints a new folder under
+`dist/app-store/` with two files to drop into
+[Apple Transporter](https://apps.apple.com/app/transporter/id1450874784):
+
+- `BraidArt-iOS-<version>-<build>.ipa` for iPhone and iPad.
+- `BraidArt-macOS-<version>-<build>.pkg` for Mac.
+
+Click **Deliver** in Transporter. Once Apple processes the files, select each
+build on its platform's version page in App Store Connect. Use the same version
+on those pages as in the command. The command only prepares local files.
+
+### Signing setup on the release Mac
+
+1. Sign into **Xcode > Settings > Accounts** with the developer team that owns
+   `com.christophefav.BraidArt`. Xcode automatically signs the iOS archive and
+   exports it for App Store Connect.
+2. In the developer team's **Manage Certificates** window, use **+** to create
+   **Apple Distribution** and **Mac Installer Distribution** if they're missing.
+   Xcode stores the certificates and private keys in Keychain. Reuse them for
+   future releases until they expire.
+3. Install a [Mac App Store Connect provisioning profile](https://developer.apple.com/help/account/provisioning-profiles/create-an-app-store-provisioning-profile/)
+   for `com.christophefav.BraidArt` and the local **Apple Distribution**
+   certificate. TestFlight requires it. Open the downloaded profile in Xcode
+   to install it. The script finds the matching profile in Xcode's cache and
+   embeds it before signing. Install a new profile when it expires or you
+   replace the Apple Distribution certificate.
+4. On the first release, macOS may ask for Keychain approval when `codesign`
+   or `productbuild` uses a new private key. Approve the prompt to let the
+   command continue.
+
+Pass `--ios` or `--mac` before the version and build to prepare just one
+platform. The release folder keeps the Xcode archive and logs if you need to
+diagnose signing or export. App Store build numbers must increase for macOS
+across versions.
 
 ## Local App Sandbox build
 
@@ -13,8 +58,8 @@ and folders selected through the system. It uses the same
 registers `.braidart` as `org.braidart.document`. The standard build lives
 at `dist/BraidArt.app`.
 
-The sandboxed bundle is for local testing. Mac App Store distribution would
-require distribution signing and packaging. See [Apple’s App Sandbox documentation](https://developer.apple.com/documentation/xcode/configuring-the-macos-app-sandbox).
+The App Store release command uses this build and signs and packages a separate
+copy. See [Apple’s App Sandbox documentation](https://developer.apple.com/documentation/xcode/configuring-the-macos-app-sandbox).
 
 ## Developer ID distribution
 
