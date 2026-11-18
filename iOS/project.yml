@@ -46,7 +46,7 @@ targets:
       - path: .
         excludes: [project.yml, Info.plist, BraidArt-iOS.xcodeproj, Tests]
       - path: ../Sources/BraidArt
-        excludes: [Resources, ContentView.swift, BraidArtApp.swift, AboutView.swift, AppIcon.swift]
+        excludes: [Resources, ContentView.swift, MacZoomableResult.swift, BraidArtApp.swift, AboutView.swift, AppIcon.swift]
       - path: ../Sources/BraidArt/Resources/Help
         type: folder
         buildPhase: resources

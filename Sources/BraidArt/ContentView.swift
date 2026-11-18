@@ -158,20 +158,14 @@ struct ContentView: View {
                         Text(L("%@ × %@ tiles · %@ parts · mean ΔE %@", String(describing: project.sampledImage.width), String(describing: project.sampledImage.height), String(describing: project.result.reports.count), String(describing: String(format:"%.2f",project.result.objective/Double(project.sampledImage.pixels.count))))).font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(L("Zoom")).font(.caption)
-                    Slider(value:$model.zoom,in:0.25...4).frame(width:100)
                     Button(L("Fit")) { model.zoom=1 }.controlSize(.small)
                 }.padding(22)
                 if model.resultNeedsWeaving {
                     Label(L("Showing the previous result. Weave again to apply the current settings."),systemImage:"clock.arrow.circlepath").font(.caption).foregroundStyle(.orange).frame(maxWidth:.infinity,alignment:.leading).padding(.horizontal,22).padding(.bottom,12)
                 }
-                GeometryReader { proxy in
-                    let fit=min((proxy.size.width-40)/image.size.width,(proxy.size.height-40)/image.size.height)
-                    ScrollView([.horizontal,.vertical]) {
-                        Image(nsImage:image).resizable().interpolation(.high).frame(width:max(1,image.size.width*fit*model.zoom),height:max(1,image.size.height*fit*model.zoom)).padding(20)
-                            .frame(minWidth:proxy.size.width,minHeight:proxy.size.height)
-                    }
-                }.background(Color.black.opacity(0.15))
+                MacZoomableResult(image: image, zoom: $model.zoom)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.15))
                 HStack {
                     Label(project.result.allPartitionsOptimal ? L("Parts proven optimal") : L("Feasible · time or gap limited"),systemImage:project.result.allPartitionsOptimal ? "checkmark.seal" : "clock").font(.caption).foregroundStyle(.secondary)
                     Spacer()

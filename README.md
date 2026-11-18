@@ -100,7 +100,8 @@ and NASA’s media usage guidelines.
    left continuity fixed by previous parts. Progress and Cancel remain available.
    Time and relative-gap limits support interactive use. Every returned part is
    checked for integral choices and valid edge colors before acceptance.
-4. Inspect the result and zoom in. **Save Project** stores a `.braidart` JSON
+4. Pinch on the trackpad to zoom the result, scroll to pan, or choose **Fit** to
+   see the entire image. **Save Project** stores a `.braidart` JSON
    project, including the 3D camera's rotation, zoom and pan, backing plane
    settings, and selected picture dimensions. Reopening restores that camera
    in the 3D view; older projects without a saved camera open in Result.
