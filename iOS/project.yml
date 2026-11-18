@@ -27,6 +27,8 @@ targets:
         buildPhase: resources
       - path: ../Sources/BraidCore/Resources/ColorCost.metal
         buildPhase: resources
+      - path: FrameworkResources/PrivacyInfo.xcprivacy
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.christophefav.BraidArt.core
@@ -44,7 +46,9 @@ targets:
     platform: iOS
     sources:
       - path: .
-        excludes: [project.yml, Info.plist, BraidArt-iOS.xcodeproj, BraidArt.entitlements, ShareExtension, Sharing, Tests]
+        excludes: [project.yml, Info.plist, PrivacyInfo.xcprivacy, BraidArt-iOS.xcodeproj, BraidArt.entitlements, FrameworkResources, ShareExtension, Sharing, Tests]
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
       - path: Sharing
       - path: ../Sources/BraidArt
         excludes: [Resources, ContentView.swift, MacZoomableResult.swift, BraidArtApp.swift, AboutView.swift, AppIcon.swift]
@@ -76,7 +80,9 @@ targets:
     platform: iOS
     sources:
       - path: ShareExtension
-        excludes: [Info.plist]
+        excludes: [Info.plist, PrivacyInfo.xcprivacy]
+      - path: ShareExtension/PrivacyInfo.xcprivacy
+        buildPhase: resources
       - path: Sharing
     settings:
       base:

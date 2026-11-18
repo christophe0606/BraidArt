@@ -2,12 +2,20 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
+case "$#:${1:-}" in
+    0:) SANDBOXED=false ;;
+    1:--sandboxed) SANDBOXED=true ;;
+    *) echo "Usage: $0 [--sandboxed]" >&2; exit 2 ;;
+esac
+APP="$ROOT/dist/BraidArt.app"
+if $SANDBOXED; then
+    APP="$ROOT/dist/sandboxed/BraidArt.app"
+fi
 Scripts/build-solver.sh
 export CLANG_MODULE_CACHE_PATH="$ROOT/.build/clang-cache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$ROOT/.build/clang-cache"
 swift build -c release --disable-sandbox --scratch-path .build/swift
 BIN="$(swift build -c release --disable-sandbox --scratch-path .build/swift --show-bin-path)"
-APP="$ROOT/dist/BraidArt.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Frameworks" "$APP/Contents/Resources/Solver/licenses"
 cp "$BIN/BraidArt" "$APP/Contents/MacOS/BraidArt"
 # Swift build engines can propagate dependency debug rpaths into release links.
@@ -40,9 +48,15 @@ done
 cp Sources/BraidArt/Resources/AppIcon.icns "$APP/Contents/Resources/BraidArtIcon.icns"
 rm -f "$APP/Contents/Resources/AppIcon.icns"
 codesign --force --sign - "$APP/Contents/Frameworks/libBraidCBC.dylib"
-codesign --force --sign - "$APP"
+if $SANDBOXED; then
+    codesign --force --sign - --entitlements Resources/BraidArt-Sandbox.entitlements "$APP"
+else
+    codesign --force --sign - "$APP"
+fi
 codesign --verify --deep --strict "$APP"
 touch "$APP"
-# Refresh Finder's project-file association after rebuilding the bundle in place.
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
+if ! $SANDBOXED; then
+    # Refresh Finder's project-file association for the standard local build.
+    /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP"
+fi
 echo "Built $APP"

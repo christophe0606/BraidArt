@@ -92,6 +92,12 @@ same as the macOS solver; see [CBCIntegration.md](CBCIntegration.md) and
 [ThirdParty.md](ThirdParty.md). The first clean build also prepares the pinned
 source archives through the macOS solver script. Build products stay in `.build`.
 
+The app, BraidCore framework, and Share Extension each bundle a
+`PrivacyInfo.xcprivacy` file. They declare local preference storage, metadata
+used to manage the share inbox and import the selected attachment, and the
+elapsed-time measurements used for export progress. The manifests declare no
+tracking or data collection. See [Apple’s required-reason API reference](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitype).
+
 ## Verification
 
 Run the BraidArt scheme's tests on a connected device:

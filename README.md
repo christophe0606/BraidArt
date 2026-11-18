@@ -220,8 +220,9 @@ cooperative cancellation; no solver executable or Homebrew installation is
 required at runtime. Upstream sources remain unmodified. See
 [the library integration notes](Docs/CBCIntegration.md) for error handling,
 threading and verification.
-`Scripts/build-app.sh` creates
-a standalone Finder bundle with native document opening, menus and local signing.
+`Scripts/build-app.sh` creates a standalone Finder bundle with native document
+opening, menus and local signing. Pass `--sandboxed` to build the local
+[App Sandbox variant](Docs/Distribution.md#local-app-sandbox-build).
 
 For distribution outside the Mac App Store, follow the short one-time Xcode and
 Keychain setup in [Distributing BraidArt](Docs/Distribution.md), then run

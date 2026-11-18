@@ -1,6 +1,24 @@
-# Distributing BraidArt outside the Mac App Store
+# macOS builds and distribution
 
-## One-time setup
+## Local App Sandbox build
+
+```sh
+./Scripts/build-app.sh --sandboxed
+open dist/sandboxed/BraidArt.app
+```
+
+This ad hoc signed build uses App Sandbox and grants read/write access to files
+and folders selected through the system. It uses the same
+`com.christophefav.BraidArt` bundle identifier as the iPhone and iPad app and
+registers `.braidart` as `org.braidart.document`. The standard build lives
+at `dist/BraidArt.app`.
+
+The sandboxed bundle is for local testing. Mac App Store distribution would
+require distribution signing and packaging. See [Apple’s App Sandbox documentation](https://developer.apple.com/documentation/xcode/configuring-the-macos-app-sandbox).
+
+## Developer ID distribution
+
+### One-time setup
 
 1. Open **Xcode > Settings > Accounts** and sign in with your Apple Account.
 2. Select your **paid developer team**, click **Manage Certificates**, then
@@ -23,7 +41,7 @@
    for a **Path to App Store Connect API private key**, press **Return** to leave
    it blank and continue with Apple Account authentication.
 
-### If Xcode rejects certificate creation
+#### If Xcode rejects certificate creation
 
 An individual enrollment belongs to its Account Holder, even if Xcode displays
 an Admin role. If Xcode reports “This operation can only be performed by the
@@ -49,7 +67,7 @@ Keychain; it does not build or upload an app. Setup is required on each release
 Mac. Regenerate the app-specific password and repeat `--setup` if credentials
 are revoked.
 
-## Each release
+### Each release
 
 Update `CFBundleShortVersionString` and `CFBundleVersion` in
 `Resources/Info.plist` for the release, then run:

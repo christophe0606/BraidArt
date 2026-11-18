@@ -761,8 +761,8 @@ final class AppModel: ObservableObject {
                         guard !export.cancelling else { return }
                         export.progress=0.8;export.message=L("Saving PNG…")
                     }
-                    // Encode beside the destination, then commit only the complete image.
-                    let temporary=url.deletingLastPathComponent().appendingPathComponent(".braidart-\(UUID().uuidString).png")
+                    // A Save panel grants access only to the selected file.
+                    let temporary=FileManager.default.temporaryDirectory.appendingPathComponent(".braidart-\(UUID().uuidString).png")
                     defer { try? FileManager.default.removeItem(at:temporary) }
                     try ImageProcessor.writePNG(image,to:temporary)
                     try Task.checkCancellation()

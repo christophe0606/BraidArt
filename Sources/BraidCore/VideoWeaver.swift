@@ -58,8 +58,11 @@ public enum VideoWeaver {
         // bottom-left origin. Convert both sides so portrait crops match preview.
         let flip=CGAffineTransform(scaleX:1,y:-1)
         let transform=flip.concatenating(preferredTransform).concatenating(flip)
-        let temporary=destination.deletingLastPathComponent().appendingPathComponent(".braidart-video-\(UUID().uuidString).mp4")
-        defer { try? FileManager.default.removeItem(at:temporary) }
+        let files = FileManager.default
+        // Stage on the destination volume without writing alongside the user-selected file.
+        let staging = try files.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: destination, create: true)
+        defer { try? files.removeItem(at: staging) }
+        let temporary = staging.appendingPathComponent("BraidArt.mp4")
         let writer=try AVAssetWriter(outputURL:temporary,fileType:.mp4)
         let size=settings.outputPixelSize
         let videoSettings:[String:Any]=[AVVideoCodecKey:format.codec,AVVideoWidthKey:Int(size.width),AVVideoHeightKey:Int(size.height),
@@ -152,9 +155,11 @@ public enum VideoWeaver {
             await writer.finishWriting()
             try Task.checkCancellation()
             guard writer.status == .completed else { throw writer.error ?? BraidError.invalid(L("Cannot finish the video file.")) }
-            if FileManager.default.fileExists(atPath:destination.path) {
-                _=try FileManager.default.replaceItemAt(destination,withItemAt:temporary)
-            } else { try FileManager.default.moveItem(at:temporary,to:destination) }
+            if files.fileExists(atPath: destination.path) {
+                _ = try files.replaceItemAt(destination, withItemAt: temporary)
+            } else {
+                try files.moveItem(at: temporary, to: destination)
+            }
             await progress(1,L("Video saved."))
             return VideoWeaveReport(frames:count,duration:segment.duration)
         }
