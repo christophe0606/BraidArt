@@ -5,7 +5,6 @@ import AppKit
 import PhotosUI
 #else
 import UIKit
-import Photos
 #endif
 import UniformTypeIdentifiers
 import Metal
@@ -61,6 +60,8 @@ enum DimensionSelectionTarget:String,Identifiable {
 /// Owns the local copy of a photo for the lifetime of the editor's source.
 final class ImportedPhoto: Transferable {
     let url: URL
+
+    init(owning url: URL) { self.url = url }
 
     init(copying file: URL) throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("BraidImport-\(UUID().uuidString)")
@@ -137,6 +138,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var tilePreviews: [TilePreview]=[]
     enum Activity { case preparingImage, extractingPalette, exclusive }
     @Published private(set) var activity: Activity?
+    @Published private var activeToneSliders = Set<KeyPath<BraidCore.Settings, Double>>()
     var busy: Bool { activity != nil }
     // Routine previews and extraction must not dim every control in the editor.
     var blocksEditing: Bool { activity == .exclusive }
@@ -206,18 +208,18 @@ final class AppModel: ObservableObject {
     #else
     @Published var showingImportChoice=false
     @Published var showingFileImport=false
-    @Published var mobileExport:MobileExportRequest?
     @Published var exportedFile:MobileExportFile?
-    private var mobileDestination=MobileExportDestination.files
+    private var mobileExportDirectory: URL?
     #endif
     var gpuName: String { MTLCreateSystemDefaultDevice()?.name ?? L("CPU fallback") }
     var tileData: TileData { TileData(settings:settings) }
+    var canChangeOutputDimensions: Bool { sourceImage != nil || project == nil }
     var preparedIsCurrent: Bool {
         prepared != nil && preparedSettings?.hasSameImagePreparation(as:settings) == true &&
         (videoSource == nil || (!isPlayingVideo && !selectingVideoFrame && preparedFrameID==frameSelectionID))
     }
     var canWeavePicture:Bool {
-        !busy && (try? settings.validate()) != nil &&
+        activeToneSliders.isEmpty && !busy && (try? settings.validate()) != nil &&
         (preparedIsCurrent || (videoSource != nil && !selectingVideoFrame))
     }
     var canWeaveVideo:Bool {
@@ -359,7 +361,7 @@ final class AppModel: ObservableObject {
         videoSource=nil;videoFrame=nil;videoFrameTime=0;selectedFrameTime=0;selectingVideoFrame=false
         preparedFrameID=nil;checkedVideoSettings=nil;frameSelectionID+=1
     }
-    private func openVideo(_ url:URL) {
+    private func openVideo(_ url:URL, ownedFile: ImportedPhoto? = nil) {
         activity = .exclusive;status=L("Opening video…")
         task=Task { [self] in
             do {
@@ -378,7 +380,7 @@ final class AppModel: ObservableObject {
                 }
                 playback.onPaused={ [weak self] time in self?.selectVideoFrame(at:time) }
                 videoPlayback=playback
-                sourceURL=url;sourceName=url.lastPathComponent;sourceImage=frame.image.platformImage;resetCrop()
+                sourceURL=url;importedPhoto=ownedFile;sourceName=url.lastPathComponent;sourceImage=frame.image.platformImage;resetCrop()
                 prepared=nil;preparedImage=nil;project=nil;resultImage=nil;curves=nil;meshes=[];cameraState=nil;selectedTab=0;activity=nil
                 prepare()
             } catch is CancellationError { activity=nil;status=L("Cancelled. Previous result retained.") }
@@ -424,6 +426,10 @@ final class AppModel: ObservableObject {
         refreshTiles()
         // Saved result keeps its own immutable settings; show it as a previous result.
         guard sourceURL != nil,!isPlayingVideo,!preparedIsCurrent else { return }
+        if let preparedSettings, settings.hasSameCropAndResolution(as: preparedSettings) {
+            prepare()
+            return
+        }
         let rev=revision
         previewTask=Task {
             try? await Task.sleep(nanoseconds:250_000_000)
@@ -431,11 +437,16 @@ final class AppModel: ObservableObject {
             prepare()
         }
     }
+    func setToneEditing(_ editing: Bool, for setting: KeyPath<BraidCore.Settings, Double>) {
+        guard activeToneSliders.contains(setting) != editing else { return }
+        if editing { activeToneSliders.insert(setting) }
+        else { activeToneSliders.remove(setting) }
+    }
     var cropAspectRatio: Double? {
         sourceImage.flatMap { CropGeometry.normalizedAspectRatio(for:settings.outputSize,imageSize:$0.size) }
     }
     func setOutputSize(_ preset:PictureExportSize) {
-        guard preset != .viewport,preset != settings.outputSize else { return }
+        guard canChangeOutputDimensions,preset != .viewport,preset != settings.outputSize else { return }
         let previousRatio=cropAspectRatio
         settings.outputSize=preset
         guard sourceImage != nil,previousRatio != cropAspectRatio else { return }
@@ -466,11 +477,22 @@ final class AppModel: ObservableObject {
         activity = .preparingImage;status=L("Preparing image…")
         task=Task {
             do {
-                let image=try await Task.detached { try input.prepare(settings:snapshot) }.valueWithCancellation()
+                let (image, preview)=try await Task.detached {
+                    let image=try input.prepare(settings:snapshot)
+                    return (image, try ImageProcessor.cgImage(image))
+                }.valueWithCancellation()
                 guard !Task.isCancelled,selection==frameSelectionID else { return }
-                // Discard an obsolete preview before publishing any pixels.
-                guard snapshot.hasSameImagePreparation(as:settings) else { activity=nil;prepare();return }
-                prepared=image;preparedSettings=snapshot;preparedFrameID=selection;preparedImage=try ImageProcessor.cgImage(image).platformImage
+                if !snapshot.hasSameImagePreparation(as: settings) {
+                    // Show intermediate tonal edits while dragging. Weave still
+                    // waits for a sample that matches the current settings.
+                    if snapshot.hasSameCropAndResolution(as: settings), !preparedIsCurrent {
+                        preparedImage=preview.platformImage
+                    }
+                    activity=nil
+                    prepare()
+                    return
+                }
+                prepared=image;preparedSettings=snapshot;preparedFrameID=selection;preparedImage=preview.platformImage
                 status=L("%@ × %@ tiles · %@ candidates per tile", String(describing: image.width), String(describing: image.height), String(describing: tileData.allTiles.count));activity=nil
                 let action=nextFrameAction;nextFrameAction = .none
                 if action == .weave { solve() }
@@ -515,6 +537,7 @@ final class AppModel: ObservableObject {
         }
     }
     func solve() {
+        guard activeToneSliders.isEmpty else { return }
         if videoSource != nil,!busy,!preparedIsCurrent,let playback=videoPlayback {
             selectVideoFrame(at:playback.pause(notify:false),after:.weave);return
         }
@@ -617,11 +640,19 @@ final class AppModel: ObservableObject {
                 finishMobileExport(url)
                 #endif
             } catch is CancellationError {
+                #if os(iOS)
+                discardMobileExport()
+                #endif
                 exportProgress=nil;activity=nil;progress=0;status=L("Video weaving cancelled. No incomplete video was saved.")
             } catch { exportProgress=nil;fail(error) }
         }
     }
-    private func fail(_ err: Error) { activity=nil;error=err.localizedDescription;status=L("Could not complete the operation.") }
+    private func fail(_ err: Error) {
+        #if os(iOS)
+        if exportedFile == nil { discardMobileExport() }
+        #endif
+        activity=nil;error=err.localizedDescription;status=L("Could not complete the operation.")
+    }
     #if os(macOS)
     func saveProject() {
         guard let project=projectForSaving,!busy else { return }
@@ -742,6 +773,9 @@ final class AppModel: ObservableObject {
                 finishMobileExport(url)
                 #endif
             } catch is CancellationError {
+                #if os(iOS)
+                discardMobileExport()
+                #endif
                 exportProgress=nil;activity=nil;progress=0;status=L("Picture export cancelled.")
             } catch {
                 exportProgress=nil;fail(error)
@@ -781,6 +815,9 @@ final class AppModel: ObservableObject {
                 finishMobileExport(url)
                 #endif
             } catch is CancellationError {
+                #if os(iOS)
+                discardMobileExport()
+                #endif
                 exportProgress=nil;activity=nil;progress=0;status=L("PDF export cancelled.")
             } catch {
                 exportProgress=nil;fail(error)
@@ -832,6 +869,9 @@ final class AppModel: ObservableObject {
                 finishMobileExport(url)
                 #endif
             } catch is CancellationError {
+                #if os(iOS)
+                discardMobileExport()
+                #endif
                 exportProgress=nil;activity=nil;progress=0;status=L("USDZ export cancelled.")
             } catch {
                 exportProgress=nil;fail(error)
@@ -857,7 +897,18 @@ extension Task where Failure == Error {
 #if os(iOS)
 extension AppModel {
     func chooseImage() { showingImportChoice=true }
+    func openNextSharedMedia(from inbox: SharedMediaInbox) {
+        guard !busy else { return }
+        do {
+            guard let url = try inbox.takeNext(), beginOpeningSource() else { return }
+            let file = ImportedPhoto(owning: url)
+            if VideoSource.isVideo(url) { openVideo(url, ownedFile: file) }
+            else { openImage { (url, file) } }
+        } catch { fail(error) }
+    }
+
     func importMobileFile(_ url:URL) {
+        guard !busy else { return }
         let access=url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
@@ -868,57 +919,41 @@ extension AppModel {
             open(url:copy)
         } catch { fail(error) }
     }
-    private func requestMobileExport(_ name:String,photos:Bool=false,operation:@escaping(URL)->Void) {
-        guard !busy else { return }
-        let start:(MobileExportDestination)->Void = { [weak self] destination in
-            guard let self else { return }
-            self.mobileExport=nil;self.mobileDestination=destination
-            do {
-                let folder=FileManager.default.temporaryDirectory.appendingPathComponent("BraidExport-\(UUID().uuidString)")
-                try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
-                operation(folder.appendingPathComponent(name))
-            } catch { self.fail(error) }
-        }
-        if photos { mobileExport=MobileExportRequest(name:name,allowsPhotos:true,start:start) }
-        else { start(.files) }
+    private func requestMobileExport(_ name: String, operation: (URL) throws -> Void) {
+        guard !busy, mobileExportDirectory == nil else { return }
+        do {
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("BraidExport-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            mobileExportDirectory = folder
+            try operation(folder.appendingPathComponent(name))
+        } catch { fail(error) }
     }
+
     private func finishMobileExport(_ url:URL) {
-        guard mobileDestination == .photos else { exportedFile=MobileExportFile(url:url);return }
-        let isVideo=VideoSource.isVideo(url)
-        activity = .exclusive;status=L("Saving to Photos…")
-        task=Task {
-            do {
-                let permission=await PHPhotoLibrary.requestAuthorization(for:.addOnly)
-                guard permission == .authorized || permission == .limited else {
-                    throw BraidError.invalid(L("Allow BraidArt to add pictures and videos in Settings → Privacy & Security → Photos, or save to Files."))
-                }
-                try await PHPhotoLibrary.shared().performChanges {
-                    if isVideo { PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL:url) }
-                    else { PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL:url) }
-                }
-                activity=nil;status=L("Saved to Photos.")
-                try? FileManager.default.removeItem(at:url.deletingLastPathComponent())
-            } catch {
-                fail(error)
-                // Keep the completed export available through Files if Photos is denied.
-                exportedFile=MobileExportFile(url:url)
-            }
-        }
+        exportedFile = MobileExportFile(url: url)
     }
-    func finishFileExport(_ saved:Bool) {
-        if let file=exportedFile { try? FileManager.default.removeItem(at:file.url.deletingLastPathComponent()) }
-        exportedFile=nil
-        status=saved ? L("Saved to Files.") : L("Export cancelled.")
+
+    private func discardMobileExport() {
+        if let folder = mobileExportDirectory { try? FileManager.default.removeItem(at: folder) }
+        mobileExportDirectory = nil
+    }
+
+    func finishFileExport(_ file: MobileExportFile, completed: Bool, error: Error?) {
+        guard exportedFile?.id == file.id else { return }
+        exportedFile = nil
+        discardMobileExport()
+        if let error { fail(error) }
+        else { status = completed ? L("Shared.") : L("Export cancelled.") }
     }
     func saveProject() {
         guard let project=projectForSaving else { return }
         requestMobileExport("\(baseName).braidart") { url in
-            do { try project.save(to:url);self.finishMobileExport(url) } catch { self.fail(error) }
+            try project.save(to:url);self.finishMobileExport(url)
         }
     }
     func exportPNG() {
         guard let project else { return }
-        requestMobileExport("\(baseName)-braid.png",photos:true) { url in
+        requestMobileExport("\(baseName)-braid.png") { url in
             self.mobileRunExport(url) {
                 try ImageProcessor.writePNG(TileRenderer.render(project),to:url)
             }
@@ -926,13 +961,13 @@ extension AppModel {
     }
     func weaveVideo() {
         guard canWeaveVideo else { return }
-        requestMobileExport("\(baseName)-braid.mp4",photos:true) { self.startVideoExport(to:$0) }
+        requestMobileExport("\(baseName)-braid.mp4") { self.startVideoExport(to:$0) }
     }
     func export3DPicture() {
         guard !busy,selectedTab==3,let view=threeDView else { return }
         do {
             let capture=try view.makePictureCapture(size:pictureExportSize.pixelSize(viewport:.zero))
-            requestMobileExport("\(baseName)-3d.png",photos:true) { self.startPictureExport(capture,to:$0) }
+            requestMobileExport("\(baseName)-3d.png") { self.startPictureExport(capture,to:$0) }
         } catch { fail(error) }
     }
     func exportPDF() {
@@ -951,7 +986,14 @@ extension AppModel {
     }
     func exportData() {
         guard let project=projectForSaving else { return }
-        requestMobileExport("\(baseName)-braid-data") { url in self.mobileRunExport(url) { try ProjectExporter.export(project,to:url) } }
+        requestMobileExport("\(baseName)-braid-data.zip") { url in
+            self.mobileRunExport(url) {
+                let directory = url.deletingPathExtension()
+                try ProjectExporter.export(project, to: directory)
+                try Task.checkCancellation()
+                try archiveMobileExport(directory, to: url)
+            }
+        }
     }
     private func mobileRunExport(_ url:URL,operation:@escaping @Sendable()throws->Void) {
         activity = .exclusive;status=L("Exporting…")
@@ -959,6 +1001,8 @@ extension AppModel {
             do {
                 try await Task.detached(priority:.userInitiated) { try operation() }.valueWithCancellation()
                 activity=nil;finishMobileExport(url)
+            } catch is CancellationError {
+                discardMobileExport();activity=nil;status=L("Export cancelled.")
             } catch { fail(error) }
         }
     }

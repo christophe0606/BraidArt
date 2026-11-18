@@ -6,6 +6,7 @@ final class ProjectTests:XCTestCase {
     @MainActor func testProjectSnapshotAndReopeningRestoreCameraAndFrame() async throws {
         let model=AppModel()
         XCTAssertTrue(model.settings.grayscale,"New sessions start in luminance mode")
+        XCTAssertTrue(model.canChangeOutputDimensions)
         var settings=Settings();settings.columns=8
         let wovenSize = PictureExportSize.custom(try CustomPictureSize(name: "Woven", width: 128, height: 32))
         let nextSize = PictureExportSize.custom(try CustomPictureSize(name: "Next", width: 96, height: 24))
@@ -14,6 +15,7 @@ final class ProjectTests:XCTestCase {
         let image=PixelImage(width:8,height:2,pixels:Array(repeating:.gray,count:16))
         let result=SolveResult(solution:Array(repeating:Array(repeating:1,count:8),count:2),reports:[],costBackend:"Test",elapsedSeconds:0)
         model.project=BraidProject(sourceName:"Saved camera",settings:settings,sampledImage:image,tileData:data,result:result)
+        model.sourceImage=try ImageProcessor.cgImage(image).platformImage
         model.settings=settings
         model.settings.backgroundMinimumDistance=27
         model.setOutputSize(nextSize)
@@ -53,8 +55,11 @@ final class ProjectTests:XCTestCase {
         XCTAssertEqual(model.cameraState,camera);XCTAssertEqual(model.pictureExportSize,.instagramPortrait)
         XCTAssertEqual(model.selectedTab,3)
         XCTAssertEqual(model.projectForSaving?.cameraState,camera)
+        XCTAssertFalse(model.canChangeOutputDimensions)
+        XCTAssertFalse(SidebarState(model:model).canChangeOutputDimensions)
         model.setOutputSize(wovenSize)
-        model.setOutputSize(nextSize)
+        XCTAssertEqual(model.settings.outputSize,nextSize)
+        XCTAssertTrue(model.canWeavePicture)
         XCTAssertEqual(model.resultImage?.size,CGSize(width:128,height:32))
         model.solve()
         await waitForWork()

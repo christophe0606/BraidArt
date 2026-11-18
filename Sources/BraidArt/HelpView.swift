@@ -111,7 +111,7 @@ struct HelpView: View {
                     Divider()
                     explanation(.sharing).id(HelpTopic.sharing)
                     #if os(iOS)
-                    Text(L("Save pictures and videos to Photos or Files. Save PDF, projects and 3D objects to Files."))
+                    Text(L("Choose an export format, then save or share it using the system share sheet. To import from another app, share a photo or video to BraidArt, then open BraidArt."))
                         .foregroundStyle(.secondary)
                     Text(L("One finger to rotate · Two fingers to pan · Pinch to zoom"))
                         .font(.callout).foregroundStyle(.secondary)

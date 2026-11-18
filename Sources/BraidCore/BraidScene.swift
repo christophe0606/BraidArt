@@ -187,7 +187,9 @@ public final class BraidMetalView: SCNView {
     }
     private func updateCamera() {
         cameraNode.position=SCNVector3(target.x + SceneScalar(cameraDistance*sin(orbitYaw)*cos(orbitPitch)),target.y + SceneScalar(cameraDistance*sin(orbitPitch)),target.z + SceneScalar(cameraDistance*cos(orbitYaw)*cos(orbitPitch)))
-        cameraNode.look(at:target);requestDisplay()
+        // Using the camera's current up vector can carry roll across orbit and fit.
+        cameraNode.look(at:target,up:SCNNode.localUp,localFront:SCNNode.localFront)
+        requestDisplay()
         onCameraChanged?(cameraState)
     }
     private func requestDisplay() {

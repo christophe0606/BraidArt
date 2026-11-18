@@ -9,6 +9,7 @@ struct SidebarState: Equatable {
     let palette: [PaletteEntry]
     let sourceName: String
     let hasSourceImage: Bool
+    let canChangeOutputDimensions: Bool
     let hasCropSelection: Bool
     let preparedSize: CGSize?
     let hasProject: Bool
@@ -22,6 +23,7 @@ struct SidebarState: Equatable {
         settings=model.settings;palette=model.paletteEntries;sourceName=model.sourceName
         customDimensions=model.customDimensions
         hasSourceImage=model.sourceImage != nil
+        canChangeOutputDimensions=model.canChangeOutputDimensions
         hasCropSelection=model.hasCropSelection
         preparedSize=model.prepared.map { CGSize(width:$0.width,height:$0.height) }
         hasProject=model.project != nil
@@ -70,9 +72,11 @@ struct SettingsSidebar: View, Equatable {
                     }
                     controls.imageWidth
                     controls.luminance
-                    if state.hasSourceImage {
-                        Button(L("Reset Crop"),action:model.resetCrop).font(.caption).disabled(!state.hasCropSelection)
-                    } else if state.hasProject {
+                    if state.hasSourceImage || state.hasProject {
+                        Button(L("Reset Crop"),action:model.resetCrop).font(.caption)
+                            .disabled(!state.hasSourceImage || !state.hasCropSelection)
+                    }
+                    if !state.canChangeOutputDimensions {
                         Text(L("This project contains the sampled image. Open the original picture to change the crop or resize.")).font(.caption).foregroundStyle(.secondary)
                     }
                 }
@@ -131,11 +135,13 @@ struct SettingsControls {
                         selection: Binding(get: { state.settings.outputSize }, set: { model.setOutputSize($0) }),
                         customDimensions: state.customDimensions, compact: compact,
                         onManage: { model.dimensionManagerTarget = .output })
+            .disabled(!state.canChangeOutputDimensions)
     }
 
     var imageWidth: some View {
         VStack(alignment: .leading, spacing: 12) {
             Stepper(L("Image width: %@ tiles", String(describing: state.settings.columns)),value:binding(\.settings.columns),in:8...256,step:2).disabled(!state.hasSourceImage)
+                .opacity(state.hasSourceImage ? 1 : 0.65)
                 .accessibilityIdentifier("sidebarImageWidth")
             if let size=state.preparedSize { Text(L("%@ × %@ = %@ tiles", String(describing: Int(size.width)), String(describing: Int(size.height)), String(describing: Int(size.width*size.height)))).font(.caption.monospacedDigit()).foregroundStyle(.secondary) }
             if let size=state.preparedSize {
@@ -147,13 +153,19 @@ struct SettingsControls {
 
     var luminance: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Toggle(L("Luminance only"),isOn:binding(\.settings.grayscale)).disabled(!state.hasSourceImage)
-            slider(L("Contrast"),value:binding(\.settings.contrast),in:0.25...3,resetTo:BraidCore.Settings().contrast).disabled(!state.hasSourceImage)
-            slider(L("Brightness"),value:binding(\.settings.brightness),in:-0.5...0.5,resetTo:BraidCore.Settings().brightness).disabled(!state.hasSourceImage)
-            if state.hasSourceImage {
+            Toggle(L("Luminance only"),isOn:binding(\.settings.grayscale))
+            slider(L("Contrast"), value: binding(\.settings.contrast), in: 0.25...3,
+                   resetTo: BraidCore.Settings().contrast,
+                   onEditingChanged: { model.setToneEditing($0, for: \.contrast) })
+            slider(L("Brightness"), value: binding(\.settings.brightness), in: -0.5...0.5,
+                   resetTo: BraidCore.Settings().brightness,
+                   onEditingChanged: { model.setToneEditing($0, for: \.brightness) })
+            if state.hasSourceImage || state.hasProject {
                 ColorPicker(L("Transparent areas"),selection:colorBinding(\.alphaBackground),supportsOpacity:false)
             }
         }
+        .disabled(!state.hasSourceImage)
+        .opacity(state.hasSourceImage ? 1 : 0.65)
     }
 
     var palette: some View {
@@ -224,11 +236,14 @@ struct SettingsControls {
         Binding(get:{model[keyPath:path]},set:{model[keyPath:path]=$0})
     }
     private func colorBinding(_ path: WritableKeyPath<BraidCore.Settings,RGB>)->Binding<Color> { Binding(get:{model.settings[keyPath:path].color},set:{model.settings[keyPath:path]=RGB(color:$0)}) }
-    private func slider(_ label: String,value: Binding<Double>,in range: ClosedRange<Double>,resetTo defaultValue:Double?=nil)->some View {
+    private func slider(_ label: String,value: Binding<Double>,in range: ClosedRange<Double>,
+                        resetTo defaultValue:Double?=nil,onEditingChanged: @escaping (Bool) -> Void = { _ in })->some View {
         VStack(alignment:.leading,spacing:4) {
             HStack { Text(label);Spacer();Text(String(format:"%.3f",value.wrappedValue)).monospacedDigit().foregroundStyle(.secondary) }.font(.caption)
             HStack(spacing:8) {
-                Slider(value:value,in:range).accessibilityLabel(label)
+                Slider(value:value,in:range,onEditingChanged:onEditingChanged)
+                    .accessibilityLabel(label)
+                    .onDisappear { onEditingChanged(false) }
                 if let defaultValue {
                     Button(L("Reset")) { value.wrappedValue=defaultValue }
                         .controlSize(.small)

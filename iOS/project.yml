@@ -44,7 +44,8 @@ targets:
     platform: iOS
     sources:
       - path: .
-        excludes: [project.yml, Info.plist, BraidArt-iOS.xcodeproj, Tests]
+        excludes: [project.yml, Info.plist, BraidArt-iOS.xcodeproj, BraidArt.entitlements, ShareExtension, Sharing, Tests]
+      - path: Sharing
       - path: ../Sources/BraidArt
         excludes: [Resources, ContentView.swift, MacZoomableResult.swift, BraidArtApp.swift, AboutView.swift, AppIcon.swift]
       - path: ../Sources/BraidArt/Resources/Help
@@ -52,10 +53,13 @@ targets:
         buildPhase: resources
     dependencies:
       - target: BraidCore
+      - target: BraidArtShare
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.christophefav.BraidArt
         INFOPLIST_FILE: Info.plist
+        CODE_SIGN_ENTITLEMENTS: BraidArt.entitlements
         MARKETING_VERSION: 1.0.0
         CURRENT_PROJECT_VERSION: 1
         SUPPORTS_MACCATALYST: NO
@@ -67,6 +71,23 @@ targets:
           rm -f "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/LICENSE" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Licensing.md"
           cp "$SRCROOT/../NOTICE" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/"
         basedOnDependencyAnalysis: false
+  BraidArtShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ShareExtension
+        excludes: [Info.plist]
+      - path: Sharing
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.christophefav.BraidArt.Share
+        INFOPLIST_FILE: ShareExtension/Info.plist
+        CODE_SIGN_ENTITLEMENTS: BraidArt.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        OTHER_LDFLAGS: '$(inherited)'
+        MARKETING_VERSION: 1.0.0
+        CURRENT_PROJECT_VERSION: 1
+        SKIP_INSTALL: YES
   BraidArtTests:
     type: bundle.unit-test
     platform: iOS

@@ -3,13 +3,6 @@ import PhotosUI
 import UniformTypeIdentifiers
 import BraidCore
 
-enum MobileExportDestination { case photos,files }
-struct MobileExportRequest:Identifiable {
-    let id=UUID()
-    let name:String
-    let allowsPhotos:Bool
-    let start:(MobileExportDestination)->Void
-}
 struct MobileExportFile:Identifiable {
     let id=UUID()
     let url:URL
@@ -47,21 +40,93 @@ struct PhotoImporter:UIViewControllerRepresentable {
     }
 }
 
-/// Standard Files save UI, including iCloud Drive and installed file providers.
-struct FileExporter:UIViewControllerRepresentable {
-    let url:URL
-    let complete:(Bool)->Void
-    func makeUIViewController(context:Context)->UIDocumentPickerViewController {
-        let picker=UIDocumentPickerViewController(forExporting:[url],asCopy:true)
-        picker.delegate=context.coordinator
+/// Present UIKit's share sheet modally on iPhone and at the export button on iPad.
+struct MobileSharePresenter: UIViewControllerRepresentable {
+    let file: MobileExportFile?
+    let complete: (MobileExportFile, Bool, Error?) -> Void
+
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.file = file
+        controller.complete = complete
+        DispatchQueue.main.async { controller.presentShareSheet() }
+    }
+
+    final class Controller: UIViewController {
+        var file: MobileExportFile?
+        var complete: ((MobileExportFile, Bool, Error?) -> Void)?
+        private var presentedFile: UUID?
+
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            presentShareSheet()
+        }
+
+        func presentShareSheet() {
+            guard let file, presentedFile != file.id, let window = viewIfLoaded?.window,
+                  window.windowScene?.activationState == .foregroundActive,
+                  let presenter = window.rootViewController, presenter.presentedViewController == nil else { return }
+            let saveCopy = SaveExportToFilesActivity(url: file.url)
+            let share = UIActivityViewController(activityItems: [file.url], applicationActivities: [saveCopy])
+            let type = UTType(filenameExtension: file.url.pathExtension)
+            let canSaveToPhotos = type?.conforms(to: .image) == true || type?.conforms(to: .movie) == true
+            share.excludedActivityTypes = canSaveToPhotos ? [.assignToContact] : [.assignToContact, .saveToCameraRoll]
+            if traitCollection.userInterfaceIdiom == .pad {
+                share.modalPresentationStyle = .popover
+                let popover = share.popoverPresentationController
+                popover?.sourceView = presenter.view
+                popover?.sourceRect = CGRect(x: presenter.view.bounds.maxX - 30,
+                                            y: presenter.view.safeAreaInsets.top + 38, width: 1, height: 1)
+                popover?.permittedArrowDirections = .up
+            }
+            let complete = self.complete
+            share.completionWithItemsHandler = { _, completed, _, error in complete?(file, completed, error) }
+            presentedFile = file.id
+            presenter.present(share, animated: true)
+        }
+    }
+}
+
+private final class SaveExportToFilesActivity: UIActivity, UIDocumentPickerDelegate {
+    private let url: URL
+
+    init(url: URL) {
+        self.url = url
+        super.init()
+    }
+
+    override class var activityCategory: UIActivity.Category { .action }
+    override var activityType: UIActivity.ActivityType? { .init("com.christophefav.BraidArt.SaveExportToFiles") }
+    override var activityTitle: String? { L("Save Export to Files") }
+    override var activityImage: UIImage? { UIImage(systemName: "folder") }
+
+    override func canPerform(withActivityItems items: [Any]) -> Bool {
+        items.contains { ($0 as? URL) == url }
+    }
+
+    override var activityViewController: UIViewController? {
+        let picker = UIDocumentPickerViewController(forExporting: [url], asCopy: true)
+        picker.delegate = self
         return picker
     }
-    func updateUIViewController(_ view:UIDocumentPickerViewController,context:Context) {}
-    func makeCoordinator()->Coordinator { Coordinator(complete:complete) }
-    final class Coordinator:NSObject,UIDocumentPickerDelegate {
-        let complete:(Bool)->Void
-        init(complete:@escaping(Bool)->Void) { self.complete=complete }
-        func documentPicker(_ controller:UIDocumentPickerViewController,didPickDocumentsAt urls:[URL]) { complete(true) }
-        func documentPickerWasCancelled(_ controller:UIDocumentPickerViewController) { complete(false) }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        activityDidFinish(!urls.isEmpty)
     }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        activityDidFinish(false)
+    }
+}
+
+func archiveMobileExport(_ folder: URL, to destination: URL) throws {
+    var coordinationError: NSError?
+    var copy: Result<Void, Error>?
+    NSFileCoordinator().coordinate(readingItemAt: folder, options: .forUploading, error: &coordinationError) { snapshot in
+        copy = Result { try FileManager.default.copyItem(at: snapshot, to: destination) }
+    }
+    if let coordinationError { throw coordinationError }
+    guard let copy else { throw CocoaError(.fileReadUnknown) }
+    try copy.get()
 }

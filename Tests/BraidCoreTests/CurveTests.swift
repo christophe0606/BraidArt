@@ -422,6 +422,25 @@ final class CurveTests:XCTestCase {
         let retained=try await Task.detached { try frozen.render() }.value
         XCTAssertEqual(retained.width,Int(viewport.width));XCTAssertEqual(retained.height,Int(viewport.height))
     }
+    @MainActor func testCameraFitLevelsThePictureAfterOrbiting() throws {
+        guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
+        let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)
+        let view=BraidMetalView(frame:CGRect(x:0,y:0,width:1000,height:800))
+        view.display(braid,meshes:try TubeMesher.build(braid),settings:project.sceneSettings!)
+        let initial=view.cameraState
+
+        view.orbit(dx:0,dy:0.9)
+        view.orbit(dx:1.3,dy:0)
+        view.pan(dx:40,dy:-20)
+        view.zoom(factor:0.6)
+        view.fit(columns:braid.columns,rows:braid.rows)
+
+        XCTAssertEqual(view.cameraState,initial)
+        XCTAssertEqual(view.cameraNode.simdWorldRight.x,1,accuracy:0.00001)
+        XCTAssertEqual(view.cameraNode.simdWorldRight.y,0,accuracy:0.00001)
+        XCTAssertEqual(view.cameraNode.simdWorldUp.x,0,accuracy:0.00001)
+        XCTAssertEqual(view.cameraNode.simdWorldUp.y,1,accuracy:0.00001)
+    }
     @MainActor func testMetalVisualizationAndCameraControls() throws {
         guard MTLCreateSystemDefaultDevice() != nil else { throw XCTSkip("Metal device unavailable") }
         let project=try fixture(),braid=try CurveGenerator.generate(solution:project.result.solution,data:project.tileData)

@@ -421,8 +421,6 @@
 
 "Files" = "Files";
 
-"Save to" = "Save to";
-
 "Choose a picture or video from Photos or Files." = "Choose a picture or video from Photos or Files.";
 
 "Pinch to scale. Drag to move or resize the crop." = "Pinch to scale. Drag to move or resize the crop.";
@@ -431,11 +429,9 @@
 
 "Use the export button above to save pictures, videos, PDF and 3D objects." = "Use the export button above to save pictures, videos, PDF and 3D objects.";
 
-"Saving to Photos…" = "Saving to Photos…";
+"Shared." = "Shared.";
 
-"Saved to Photos." = "Saved to Photos.";
-
-"Saved to Files." = "Saved to Files.";
+"Save Export to Files" = "Save Export to Files";
 
 "Export cancelled." = "Export cancelled.";
 
@@ -443,11 +439,9 @@
 
 "Cannot open the selected picture or video." = "Cannot open the selected picture or video.";
 
-"Allow BraidArt to add pictures and videos in Settings → Privacy & Security → Photos, or save to Files." = "Allow BraidArt to add pictures and videos in Settings → Privacy & Security → Photos, or save to Files.";
-
 "Pinch to zoom the woven image. Drag to move around when zoomed in." = "Pinch to zoom the woven image. Drag to move around when zoomed in.";
 
-"Save pictures and videos to Photos or Files. Save PDF, projects and 3D objects to Files." = "Save pictures and videos to Photos or Files. Save PDF, projects and 3D objects to Files.";
+"Choose an export format, then save or share it using the system share sheet. To import from another app, share a photo or video to BraidArt, then open BraidArt." = "Choose an export format, then save or share it using the system share sheet. To import from another app, share a photo or video to BraidArt, then open BraidArt.";
 
 "Licenses & notices" = "Licenses & notices";
 

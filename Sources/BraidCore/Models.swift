@@ -79,8 +79,11 @@ public struct Settings: Codable, Equatable, Sendable {
         threads=try values.decode(Int.self,forKey:.threads)
     }
     private enum LegacyCodingKeys:String,CodingKey { case cropAspectRatio }
+    public func hasSameCropAndResolution(as other: Settings) -> Bool {
+        crop == other.crop && columns == other.columns
+    }
     public func hasSameImagePreparation(as other: Settings) -> Bool {
-        crop == other.crop && columns == other.columns && grayscale == other.grayscale &&
+        hasSameCropAndResolution(as: other) && grayscale == other.grayscale &&
         contrast == other.contrast && brightness == other.brightness && alphaBackground == other.alphaBackground
     }
     public func validate() throws {

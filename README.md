@@ -8,8 +8,8 @@ building on an Intel Mac produces an Intel app and solver.
 ## iPhone and iPad
 
 The universal app requires iOS/iPadOS 26 or later. It uses a landscape workspace with a settings sidebar on iPad,
-and portrait/landscape tabs on iPhone. It supports touch controls for 2D/3D and
-Photos or Files for picture/video exports. PDF and 3D objects export through Files.
+and portrait/landscape tabs on iPhone. It supports touch controls for 2D/3D,
+the system share sheet for exports, and photo or video sharing into BraidArt.
 See [iOS build and testing instructions](Docs/iOS.md).
 
 ## Run on macOS
@@ -66,6 +66,8 @@ and NASA’s media usage guidelines.
    in Prepare or to the Prepare dimensions in 3D.
    Saved projects carry their selected dimensions, so they still open correctly
    on another Mac without your custom-size library.
+   When a project opens with its sampled image, the original-image controls
+   are disabled until you open an original picture.
 2. Start with black and white strands over a gray background, or set a maximum
    of two to eight colors and select **Extract** to find representative colors
    in the cropped image. **Color separation** controls how similar shades are
@@ -96,6 +98,7 @@ and NASA’s media usage guidelines.
    combinations. New sessions start with **Luminance only** enabled; turn it off
    for color artwork. Existing projects restore their saved mode. Luminance,
    contrast, brightness and alpha compositing are applied before sampling.
+   The sampled image in Prepare updates as you drag the contrast and brightness sliders.
 3. Click **Weave Image**. Parts are solved in the notebook's order with top and
    left continuity fixed by previous parts. Progress and Cancel remain available.
    Time and relative-gap limits support interactive use. Every returned part is

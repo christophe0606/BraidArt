@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 import BraidCore
 @testable import BraidArt
@@ -92,20 +93,42 @@ final class SidebarTests: XCTestCase {
         model.open(url:url)
         try await waitForWork(model)
         let original=try XCTUnwrap(model.prepared)
+        let cropImage=try XCTUnwrap(model.sourceImage)
+        var previewUpdates=0
+        let observation=model.$preparedImage.dropFirst().sink { _ in previewUpdates+=1 }
+        defer { observation.cancel() }
+        XCTAssertTrue(model.canWeavePicture)
+        model.setToneEditing(true, for: \.contrast)
+        XCTAssertFalse(model.canWeavePicture)
+        model.solve()
+        XCTAssertFalse(model.busy)
         model.settings.contrast=1.4
-        model.prepare()
+        model.settingsChanged()
         XCTAssertTrue(model.busy)
         XCTAssertFalse(model.blocksEditing)
         // A second edit arrives while the first preview is still being prepared.
         model.settings.contrast=1.8
+        model.settings.brightness=0.15
         model.settingsChanged()
         let sidebar=SidebarState(model:model)
         try await waitForWork(model)
         XCTAssertTrue(model.preparedIsCurrent)
+        XCTAssertFalse(model.canWeavePicture, "Finishing a preview must keep Weave disabled while the slider is held")
+        XCTAssertTrue(model.sourceImage === cropImage)
+        XCTAssertEqual(previewUpdates,2,"The in-flight preview and the latest edit should both reach Prepare")
         XCTAssertNotEqual(model.prepared,original)
         XCTAssertEqual(model.prepared,try ImageProcessor.prepare(url:url,settings:model.settings))
         XCTAssertEqual(SidebarState(model:model),sidebar,
                        "Applying new pixels at the same dimensions must not invalidate the sidebar")
+        model.setToneEditing(true, for: \.brightness)
+        model.setToneEditing(false, for: \.contrast)
+        XCTAssertFalse(model.canWeavePicture)
+        model.settings.brightness=0.3
+        model.settingsChanged()
+        model.setToneEditing(false, for: \.brightness)
+        XCTAssertFalse(model.canWeavePicture, "Releasing the slider must wait for the final sample")
+        try await waitForWork(model)
+        XCTAssertTrue(model.canWeavePicture)
     }
 
     @MainActor func testExtractionKeepsControlsEnabledAndUnrelatedUpdatesOutOfSidebar() async throws {

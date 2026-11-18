@@ -6,6 +6,7 @@ struct MobileContentView:View {
     private static let initialPanelFraction: CGFloat = 0.38
     @ObservedObject var model:AppModel
     @State private var showingInfo=false
+    @State private var exportProgressPresented = false
     @State private var showingPhoneSettings = false
     @State private var liveSettings: PhoneLiveSettings?
     @State private var panelFraction = initialPanelFraction
@@ -13,6 +14,7 @@ struct MobileContentView:View {
     @Namespace private var settingsAnimation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.scenePhase) private var scenePhase
     @AppStorage("iPadSidebarWidth") private var sidebarWidth=330.0
     @AppStorage("iPadSidebarVisible") private var sidebarVisible=true
     @State private var sidebarResizeStart:Double?
@@ -111,18 +113,18 @@ struct MobileContentView:View {
                 }
             }.ignoresSafeArea()
         }
-        .confirmationDialog(L("Save to"),isPresented:Binding(get:{model.mobileExport != nil},set:{if !$0,model.mobileExport != nil { model.mobileExport=nil }}),titleVisibility:.visible) {
-            if let request=model.mobileExport {
-                Button(L("Photos")) { request.start(.photos) }
-                Button(L("Files")) { request.start(.files) }
-            }
-        }
-        .sheet(item:$model.exportedFile) { file in
-            FileExporter(url:file.url,complete:model.finishFileExport).interactiveDismissDisabled()
+        .background {
+            MobileSharePresenter(
+                file: scenePhase == .active && model.exportProgress == nil && !exportProgressPresented ? model.exportedFile : nil,
+                complete: model.finishFileExport
+            ).allowsHitTesting(false)
         }
         .sheet(isPresented:$showingInfo) { MobileInfoView() }
         .sheet(item:$model.dimensionManagerTarget) { DimensionManagerView(model:model,target:$0) }
-        .sheet(item:$model.exportProgress) { ExportProgressView(export:$0,cancel:model.cancel).presentationDetents([.height(240)]) }
+        .sheet(item:$model.exportProgress, onDismiss: { exportProgressPresented = false }) {
+            ExportProgressView(export:$0,cancel:model.cancel).presentationDetents([.height(240)])
+                .onAppear { exportProgressPresented = true }
+        }
         .alert("BraidArt",isPresented:Binding(get:{model.error != nil},set:{if !$0 { model.error=nil }})) {
             Button(L("OK")) { model.error=nil }
         } message: { Text(model.error ?? "") }
@@ -188,7 +190,7 @@ struct MobileContentView:View {
                 Button { showLiveSettings(panel) } label: {
                     settingsIcon(panel.title, symbol: panel.symbol)
                 }
-                .disabled(model.blocksEditing)
+                .disabled(!panel.isEnabled(for: model))
                 .accessibilityIdentifier(panel.rawValue)
             }
             Button { showingPhoneSettings = true } label: {
@@ -334,7 +336,7 @@ struct MobileContentView:View {
             if isPad { Label(L("Save & export"),systemImage:"square.and.arrow.up") }
             else { settingsIcon(L("Save & export"), symbol: "square.and.arrow.up") }
         }
-            .disabled(model.busy).accessibilityIdentifier("export")
+            .disabled(model.busy || model.exportedFile != nil).accessibilityIdentifier("export")
     }
     private var phoneProgressOverlay: some View {
         Group {
@@ -380,29 +382,42 @@ struct MobileContentView:View {
                 }.frame(maxWidth:.infinity,maxHeight:.infinity)
             }
         } else {
-        ScrollView {
-            VStack(alignment:.leading,spacing:16) {
-                Text(L("A picture, reimagined as strands.")).font(.title2.bold())
-                if let image=model.sourceImage {
-                    CropEditor(image:image,crop:$model.settings.crop,hasSelection:$model.hasCropSelection,aspectRatio:model.cropAspectRatio,onDelete:model.resetCrop,player:model.videoPlayback?.player)
-                        .frame(height:isPad ? 300 : 240).disabled(model.blocksEditing)
-                    HStack {
-                        Text(L("Pinch to scale. Drag to move or resize the crop.")).font(.caption).foregroundStyle(.secondary)
-                        Spacer()
-                        Button(L("Reset Crop"),action:model.resetCrop).font(.caption)
-                    }
-                    if let video=model.videoSource,let segment=model.videoSegment,let playback=model.videoPlayback {
-                        VideoTimelineView(playback:playback,source:video,segment:segment,selectFrame:model.selectVideoFrame,changeSegment:model.setVideoSegment,disabled:model.blocksEditing)
-                    }
+            ScrollViewReader { scroll in
+                ScrollView {
+                    VStack(alignment:.leading,spacing:16) {
+                        Text(L("A picture, reimagined as strands.")).font(.title2.bold())
+                        if !model.canChangeOutputDimensions && (!isPad || !sidebarVisible) {
+                            Text(L("This project contains the sampled image. Open the original picture to change the crop or resize."))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        if let image=model.sourceImage {
+                            CropEditor(image:image,crop:$model.settings.crop,hasSelection:$model.hasCropSelection,aspectRatio:model.cropAspectRatio,onDelete:model.resetCrop,player:model.videoPlayback?.player)
+                                .frame(height:isPad ? 300 : 240).disabled(model.blocksEditing)
+                            HStack {
+                                Text(L("Pinch to scale. Drag to move or resize the crop.")).font(.caption).foregroundStyle(.secondary)
+                                Spacer()
+                                Button(L("Reset Crop"),action:model.resetCrop).font(.caption)
+                            }
+                            if let video=model.videoSource,let segment=model.videoSegment,let playback=model.videoPlayback {
+                                VideoTimelineView(playback:playback,source:video,segment:segment,selectFrame:model.selectVideoFrame,changeSegment:model.setVideoSegment,disabled:model.blocksEditing)
+                            }
+                        }
+                        if let image=model.preparedImage {
+                            VStack(alignment: .leading, spacing: 16) {
+                                Text(L("SAMPLED IMAGE")).font(.caption.bold()).foregroundStyle(.secondary)
+                                Image(platformImage:image).resizable().interpolation(.none).scaledToFit().frame(maxWidth:.infinity,maxHeight:240)
+                                    .accessibilityIdentifier("sampledPicturePreview")
+                            }.id("sampledImage")
+                        }
+                    }.padding(20)
                 }
-                if let image=model.preparedImage {
-                    Text(L("SAMPLED IMAGE")).font(.caption.bold()).foregroundStyle(.secondary)
-                    Image(platformImage:image).resizable().interpolation(.none).scaledToFit().frame(maxWidth:.infinity,maxHeight:240)
+                .contentMargins(.bottom, bottomInset, for: .scrollContent)
+                .accessibilityIdentifier("prepareWorkspace")
+                .onChange(of: liveSettings == .luminance && model.preparedImage != nil) { _, revealSample in
+                    guard revealSample else { return }
+                    scroll.scrollTo("sampledImage", anchor: .top)
                 }
-            }.padding(20)
-        }
-        .contentMargins(.bottom, bottomInset, for: .scrollContent)
-        .accessibilityIdentifier("prepareWorkspace")
+            }
         }
     }
     private func library(bottomInset: CGFloat) -> some View {

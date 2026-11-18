@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 
 public enum ImageProcessor {
     private static let colorSpace=CGColorSpace(name:CGColorSpace.sRGB)!
+    private static let context=CIContext(options:[.workingColorSpace:colorSpace,.outputColorSpace:colorSpace,
+                                                 .useSoftwareRenderer:false,.cacheIntermediates:false])
     public static func thumbnail(url: URL, maxSize: Int = 1600) throws -> CGImage {
         guard let source=CGImageSourceCreateWithURL(url as CFURL,nil),let image=CGImageSourceCreateThumbnailAtIndex(source,0,[
             kCGImageSourceCreateThumbnailFromImageAlways:true,kCGImageSourceThumbnailMaxPixelSize:maxSize,
@@ -56,7 +58,6 @@ public enum ImageProcessor {
         image=controls.outputImage ?? image
         let scale=CIFilter.lanczosScaleTransform(); scale.inputImage=image; scale.scale=Float(Double(height)/rect.height); scale.aspectRatio=Float((Double(width)/rect.width)/(Double(height)/rect.height))
         image=scale.outputImage ?? image
-        let context=CIContext(options:[.workingColorSpace:colorSpace,.outputColorSpace:colorSpace,.useSoftwareRenderer:false])
         guard let cg=context.createCGImage(image,from:CGRect(x:0,y:0,width:width,height:height),format:.RGBA8,colorSpace:colorSpace) else { throw BraidError.invalid(L("Image preparation failed.")) }
         return try pixels(from:cg)
     }

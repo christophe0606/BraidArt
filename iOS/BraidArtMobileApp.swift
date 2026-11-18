@@ -4,13 +4,39 @@ import BraidCore
 @main
 struct BraidArtMobileApp:App {
     @StateObject private var model=makeMobileModel()
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var checkedSharedMedia = false
+
     var body:some Scene {
         WindowGroup {
             MobileContentView(model:model)
                 .onOpenURL { model.importMobileFile($0) }
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .background { checkedSharedMedia = false }
+                }
+                .onChange(of: scenePhase == .active && !model.busy, initial: true) { _, canImport in
+                    guard canImport, !checkedSharedMedia else { return }
+                    checkedSharedMedia = true
+                    if let inbox = try? SharedMediaInbox() { model.openNextSharedMedia(from: inbox) }
+                }
                 #if DEBUG
                 .task {
-                    if ProcessInfo.processInfo.arguments.contains("--background-weave-fixture") {
+                    if ProcessInfo.processInfo.arguments.contains("--sampled-project-fixture") {
+                        do {
+                            var settings=model.settings
+                            settings.columns=8
+                            settings.outputSize = .custom(try CustomPictureSize(name:"Test",width:128,height:128))
+                            let image=PixelImage(width:8,height:8,pixels:Array(repeating:.gray,count:64))
+                            let solution=Array(repeating:Array(repeating:1,count:8),count:8)
+                            let result=SolveResult(solution:solution,reports:[],costBackend:"Fixture",elapsedSeconds:0)
+                            let project=BraidProject(sourceName:"Sampled fixture",settings:settings,sampledImage:image,
+                                                     tileData:TileData(settings:settings),result:result)
+                            let url=FileManager.default.temporaryDirectory.appendingPathComponent("sampled-test.braidart")
+                            try project.save(to:url);model.open(url:url)
+                            while model.busy { try await Task.sleep(for:.milliseconds(10)) }
+                            if model.project != nil { model.selectedTab=0 }
+                        } catch { model.error=error.localizedDescription }
+                    } else if ProcessInfo.processInfo.arguments.contains("--background-weave-fixture") {
                         do {
                             let pixels:[RGB]=(0..<800).map { index in
                                 let r=Double((index*37)%101)/100,g=Double((index*71)%101)/100,b=Double((index*19)%101)/100

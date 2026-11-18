@@ -1,6 +1,42 @@
+import UIKit
 import XCTest
 
 final class MobileUITests:XCTestCase {
+    @MainActor
+    func testSampledProjectDisablesOriginalImageControls() {
+        continueAfterFailure=false
+        let app=XCUIApplication()
+        app.launchArguments=["-hasShownFirstLaunchHelp","YES","--sampled-project-fixture","-AppleLanguages","(en)","-AppleLocale","en_US"]
+        let isPad=UIDevice.current.userInterfaceIdiom == .pad
+        XCUIDevice.shared.orientation=isPad ? .landscapeLeft : .portrait
+        app.launch()
+        XCTAssertTrue(app.images["sampledPicturePreview"].waitForExistence(timeout:10))
+
+        let tabs=isPad ? app.segmentedControls.firstMatch.buttons : app.tabBars.firstMatch.buttons
+        if isPad {
+            if !app.scrollViews["settingsSidebar"].exists { app.buttons["sidebarToggle"].tap() }
+            for control in [app.buttons["Manage Dimensions…"],app.buttons["sidebarImageWidth-Increment"],
+                            app.sliders["Contrast"],app.sliders["Brightness"],app.buttons["Reset Crop"]] {
+                XCTAssertTrue(control.exists)
+                XCTAssertFalse(control.isEnabled)
+            }
+        } else {
+            for identifier in ["outputDimensions","imageWidth","luminance"] {
+                let button=app.buttons[identifier]
+                XCTAssertTrue(button.exists)
+                XCTAssertFalse(button.isEnabled)
+            }
+            XCTAssertTrue(app.buttons["openSettingsMedia"].isEnabled)
+            XCTAssertTrue(app.buttons["phoneSettings"].isEnabled)
+        }
+        XCTAssertTrue(app.buttons["weave"].isEnabled)
+        screenshot("Sampled project with dimmed image settings")
+
+        tabs["3D"].tap()
+        if !isPad { app.buttons["pictureDimensions"].tap() }
+        XCTAssertTrue(app.buttons["Manage Dimensions…"].isEnabled)
+    }
+
     @MainActor
     func testIPhoneFrenchTabLabelsFitBothOrientations() throws {
         continueAfterFailure=false
@@ -147,13 +183,26 @@ final class MobileUITests:XCTestCase {
         dismissPanel.tap()
 
         luminance.tap()
-        XCTAssertTrue(panel.sliders["Contrast"].isHittable)
+        let contrast = panel.sliders["Contrast"]
+        XCTAssertTrue(contrast.isHittable)
+        let preview = app.images["sampledPicturePreview"]
+        XCTAssertTrue(preview.exists)
+        XCTAssertLessThanOrEqual(preview.frame.maxY, handle.frame.minY + 1)
+        let original = preview.screenshot().pngRepresentation
+        contrast.adjust(toNormalizedSliderPosition: 0.9)
+        let contrasted = preview.screenshot().pngRepresentation
+        XCTAssertNotEqual(original, contrasted)
         let collapse = handle.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
         collapse.press(forDuration: 0.05, thenDragTo: collapse.withOffset(CGVector(dx: 0, dy: 200)))
         let brightness = panel.sliders["Brightness"]
         XCTAssertFalse(brightness.isHittable)
         for _ in 0..<3 where !brightness.isHittable { panel.swipeUp() }
         XCTAssertTrue(brightness.isHittable, "The overlay controls must scroll independently")
+        let beforeBrightness = preview.screenshot().pngRepresentation
+        brightness.adjust(toNormalizedSliderPosition: 0.9)
+        XCTAssertNotEqual(beforeBrightness, preview.screenshot().pngRepresentation)
+        expectation(for: NSPredicate(format: "enabled == true"), evaluatedWith: app.buttons["weave"])
+        waitForExpectations(timeout: 5)
         dismissPanel.tap()
 
         tabs.buttons["Tile Library"].tap()
@@ -183,9 +232,7 @@ final class MobileUITests:XCTestCase {
         XCTAssertTrue(app.descendants(matching:.any)["sculptureCanvas"].firstMatch.waitForExistence(timeout:10))
         app.buttons["export"].tap()
         app.buttons["3D View as PNG…"].tap()
-        XCTAssertTrue(app.buttons["Photos"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.buttons["Files"].exists)
-        app.buttons["Files"].tap()
+        shareAction("Save to Files", in:app).tap()
         savePhoneFile(app,name:"BraidArt-iPhone-3D-Test-\(UUID().uuidString.prefix(8)).png")
         expectExportFinished(app)
         screenshot("iPhone 3D picture exported to Files")
@@ -197,10 +244,11 @@ final class MobileUITests:XCTestCase {
         weavePhoneFixture(app)
         app.buttons["export"].tap()
         app.buttons["Result as PNG…"].tap()
-        XCTAssertTrue(app.buttons["Photos"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.buttons["Files"].exists)
-        screenshot("iPhone picture destination choices")
-        app.buttons["Photos"].tap()
+        let saveImage = shareAction("Save Image", in:app)
+        XCTAssertFalse(app.cells.matching(NSPredicate(format:"label IN %@", ["Assign to Contact", "Assigner à un contact"])).firstMatch.exists)
+        screenshot("iPhone PNG share quick actions")
+        XCTAssertTrue(app.descendants(matching:.any)["Save Export to Files"].firstMatch.exists)
+        saveImage.tap()
         let springboard=XCUIApplication(bundleIdentifier:"com.apple.springboard")
         let permission=springboard.alerts.firstMatch
         if permission.waitForExistence(timeout:5) {
@@ -212,25 +260,28 @@ final class MobileUITests:XCTestCase {
         screenshot("iPhone picture saved to Photos")
         app.buttons["export"].tap()
         app.buttons["Result as PNG…"].tap()
-        app.buttons["Files"].tap()
+        shareAction("Save Export to Files", in:app).tap()
         savePhoneFile(app,name:"BraidArt-iPhone-Test-\(UUID().uuidString.prefix(8)).png")
         expectExportFinished(app)
         screenshot("iPhone picture saved to Files")
     }
     @MainActor
-    func testIPhonePDFAnd3DObjectsUseFiles() throws {
+    func testIPhoneDocumentsUseShareSheet() throws {
         continueAfterFailure=false
         let app=launchPhoneFixture()
         weavePhoneFixture(app)
-        for (title,suffix) in [("Vector PDF…","pdf"),("3D Object (GLB)…","glb"),("3D Object (USDZ)…","usdz")] {
+        for (title,suffix) in [("Save Project…","braidart"),("Vector PDF…","pdf"),("3D Object (GLB)…","glb"),("3D Object (USDZ)…","usdz")] {
             app.buttons["export"].tap()
             app.buttons[title].tap()
-            XCTAssertTrue(app.buttons["Save"].waitForExistence(timeout:30) || app.buttons["Move"].waitForExistence(timeout:10))
-            XCTAssertFalse(app.buttons["Photos"].exists,"\(title) must use Files directly")
+            let saveCopy = shareAction("Save Export to Files", in:app)
+            let more = app.cells.matching(NSPredicate(format:"label IN %@", ["See More", "En voir plus"])).firstMatch
+            if more.exists { more.tap() }
+            let photoActions = ["Save Image", "Save Video", "Enregistrer l’image", "Enregistrer la vidéo"]
+            XCTAssertFalse(app.cells.matching(NSPredicate(format:"label IN %@", photoActions)).firstMatch.exists)
+            saveCopy.tap()
             savePhoneFile(app,name:"BraidArt-iPhone-Test-\(UUID().uuidString.prefix(8)).\(suffix)")
             expectExportFinished(app)
         }
-        screenshot("iPhone PDF GLB USDZ Files exports completed")
     }
     @MainActor private func launchPhoneFixture()->XCUIApplication {
         let app=XCUIApplication()
@@ -270,8 +321,20 @@ final class MobileUITests:XCTestCase {
         waitForExpectations(timeout: 30)
         XCTAssertFalse(app.alerts["BraidArt"].exists)
     }
+    @MainActor private func shareAction(_ title: String, in app: XCUIApplication) -> XCUIElement {
+        let french = ["Save to Files": "Enregistrer dans Fichiers", "Save Image": "Enregistrer l’image"]
+        let labels = [title, french[title]].compactMap { $0 }
+        let action = app.descendants(matching:.any).matching(NSPredicate(format:"label IN %@", labels)).firstMatch
+        let more = app.cells.matching(NSPredicate(format:"label IN %@", ["See More", "En voir plus"])).firstMatch
+        let ready = NSPredicate { _,_ in action.exists || more.exists }
+        let available = XCTNSPredicateExpectation(predicate:ready, object:nil)
+        XCTAssertEqual(XCTWaiter.wait(for:[available],timeout:20), .completed, "Share sheet for \(title)")
+        if !action.exists && more.exists { more.tap() }
+        XCTAssertTrue(action.waitForExistence(timeout:8), "Share action \(title)")
+        return action
+    }
     @MainActor private func savePhoneFile(_ app:XCUIApplication,name:String) {
-        let save=app.buttons["Save"]
+        let save=app.buttons.matching(NSPredicate(format:"label IN %@",["Save", "Enregistrer"])).firstMatch
         XCTAssertTrue(save.waitForExistence(timeout:30) || app.buttons["Move"].waitForExistence(timeout:5))
         screenshot("iPhone standard Files save dialog")
         let filename=app.textFields.firstMatch
@@ -317,9 +380,10 @@ final class MobileUITests:XCTestCase {
         screenshot("iPad 3D rotated and zoomed")
         app.buttons["export"].tap()
         app.buttons["3D View as PNG…"].tap()
-        XCTAssertTrue(app.buttons["Photos"].waitForExistence(timeout:5))
-        XCTAssertTrue(app.buttons["Files"].exists)
-        app.buttons["Files"].tap()
+        _ = shareAction("Save Export to Files", in:app)
+        screenshot("iPad picture share sheet")
+        _ = shareAction("Save Image", in:app)
+        shareAction("Save Export to Files", in:app).tap()
         XCTAssertTrue(app.navigationBars["Move"].waitForExistence(timeout:20) || app.buttons["Save"].waitForExistence(timeout:10))
         screenshot("iPad Files export")
     }

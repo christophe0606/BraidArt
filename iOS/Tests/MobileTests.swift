@@ -1,7 +1,6 @@
 import XCTest
 import UIKit
 import AVFoundation
-import Photos
 import BraidCore
 @testable import BraidArt
 
@@ -27,77 +26,91 @@ final class MobileTests:XCTestCase {
         model.curves=curves;model.meshes=try TubeMesher.build(curves)
         return model
     }
-    private func completedFile(_ model:AppModel) async throws -> URL {
+    private func completedFile(_ model:AppModel) async throws -> MobileExportFile {
         for _ in 0..<200 {
             if let error=model.error { XCTFail(error);break }
-            if let file=model.exportedFile { return file.url }
+            if let file=model.exportedFile { return file }
             try await Task.sleep(for:.milliseconds(100))
         }
         throw BraidError.invalid("Export did not complete")
     }
-    func testNativeSolverAndPictureDestinationChoice() async throws {
+    func testNativeSolverAndShareablePicture() async throws {
         let model=try await wovenModel()
         try model.project!.result.validate(tileData:model.project!.tileData)
-        model.setOutputSize(.custom(try CustomPictureSize(name:"Next",width:192,height:96)))
+        model.sourceImage=try ImageProcessor.cgImage(model.project!.sampledImage).platformImage
+        let nextSize = PictureExportSize.custom(try CustomPictureSize(name:"Next",width:192,height:96))
+        model.setOutputSize(nextSize)
+        XCTAssertEqual(model.settings.outputSize,nextSize)
         model.exportPNG()
-        let request=try XCTUnwrap(model.mobileExport)
-        XCTAssertTrue(request.allowsPhotos)
-        XCTAssertNil(model.exportedFile)
-        request.start(.files)
-        let url=try await completedFile(model)
-        let image=try XCTUnwrap(UIImage(contentsOfFile:url.path)?.cgImage)
+        let file=try await completedFile(model)
+        let image=try XCTUnwrap(UIImage(contentsOfFile:file.url.path)?.cgImage)
         XCTAssertEqual(image.width,128);XCTAssertEqual(image.height,128)
-        model.finishFileExport(false)
-        XCTAssertFalse(FileManager.default.fileExists(atPath:url.path))
+        model.finishFileExport(file, completed:false, error:nil)
+        XCTAssertFalse(FileManager.default.fileExists(atPath:file.url.path))
     }
-    func testPDFAndObjectsGoDirectlyToFiles() async throws {
+    func testShareablePDFObjectsAndDataArchive() async throws {
         let model=try await wovenModel()
-        for kind in ["pdf","glb","usdz"] {
-            switch kind { case "pdf": model.exportPDF();case "glb": model.exportGLB();default: model.exportUSDZ() }
-            XCTAssertNil(model.mobileExport,"\(kind) must not offer Photos")
-            let url=try await completedFile(model)
-            XCTAssertEqual(url.pathExtension,kind)
-            XCTAssertGreaterThan(try Data(contentsOf:url).count,100)
-            model.finishFileExport(false)
+        let exports = [("pdf", model.exportPDF), ("glb", model.exportGLB), ("usdz", model.exportUSDZ), ("zip", model.exportData)]
+        for (suffix, export) in exports {
+            export()
+            let file=try await completedFile(model)
+            XCTAssertEqual(file.url.pathExtension,suffix)
+            let data = try Data(contentsOf:file.url)
+            XCTAssertGreaterThan(data.count,100)
+            if suffix == "zip" {
+                XCTAssertEqual(Array(data.prefix(4)), [0x50, 0x4b, 0x03, 0x04])
+                XCTAssertNotNil(data.range(of: Data("solution.json".utf8)))
+                XCTAssertNotNil(data.range(of: Data("project.braidart".utf8)))
+            }
+            model.finishFileExport(file, completed:true, error:nil)
+            XCTAssertFalse(FileManager.default.fileExists(atPath:file.url.path))
         }
     }
-    func testVideoWorkflowAndDestinationChoice() async throws {
+    func testVideoWorkflowAndShareableMP4() async throws {
         let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
         defer { try? FileManager.default.removeItem(at:folder) }
         let model=try await videoModel(in:folder)
         model.weaveVideo()
-        let request=try XCTUnwrap(model.mobileExport)
-        XCTAssertTrue(request.allowsPhotos)
-        request.start(.files)
-        let url=try await completedFile(model)
-        let asset=AVURLAsset(url:url)
+        let file=try await completedFile(model)
+        let asset=AVURLAsset(url:file.url)
         let video=try await asset.loadTracks(withMediaType:.video)
         let audio=try await asset.loadTracks(withMediaType:.audio)
         XCTAssertEqual(video.count,1);XCTAssertEqual(audio.count,1)
         let size=try await video.first!.load(.naturalSize)
         XCTAssertEqual(size.width,128);XCTAssertEqual(size.height,128)
-        model.finishFileExport(false)
+        model.finishFileExport(file, completed:false, error:nil)
     }
-    func testVideoCanSaveToPhotosWhenAuthorized() async throws {
-        guard PHPhotoLibrary.authorizationStatus(for:.addOnly) == .authorized else {
-            throw XCTSkip("Grant add-only Photos permission through the picture-export UI test first")
+
+    func testSharedPhotoAndVideoOpenInPrepare() async throws {
+        let fm = FileManager.default
+        let folder = try SharedMediaInbox().root.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at:folder,withIntermediateDirectories:true)
+        defer { try? fm.removeItem(at:folder) }
+        let inbox = SharedMediaInbox(root: folder.appendingPathComponent("TestInbox"))
+        let picture = folder.appendingPathComponent("shared-picture.png")
+        let movie = folder.appendingPathComponent("shared-video.mov")
+        try ImageProcessor.writePNG(ImageProcessor.cgImage(PixelImage(width: 8, height: 8, pixels: Array(repeating: .gray, count: 64))), to: picture)
+        try await VideoFixture.make(at: movie, audio: false)
+        let model = AppModel(defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        model.settings.columns = 8
+        for source in [picture, movie] {
+            let staged = try inbox.stage(source, filename: source.lastPathComponent)
+            XCTAssertNil(try inbox.takeNext(), "Wait until the extension publishes the complete file")
+            try inbox.enqueue(staged)
+            model.selectedTab = 1
+            model.openNextSharedMedia(from: inbox)
+            for _ in 0..<100 {
+                if !model.busy { break }
+                try await Task.sleep(for: .milliseconds(50))
+            }
+            XCTAssertNil(model.error)
+            XCTAssertEqual(model.sourceName, source.lastPathComponent)
+            XCTAssertEqual(model.selectedTab, 0)
+            XCTAssertTrue(model.canWeavePicture)
+            XCTAssertEqual(model.videoSource != nil, source == movie)
+            XCTAssertNil(try inbox.takeNext())
         }
-        let folder=FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at:folder,withIntermediateDirectories:true)
-        defer { try? FileManager.default.removeItem(at:folder) }
-        let model=try await videoModel(in:folder)
-        model.weaveVideo()
-        let request=try XCTUnwrap(model.mobileExport)
-        XCTAssertTrue(request.allowsPhotos)
-        request.start(.photos)
-        for _ in 0..<300 {
-            if model.status==L("Saved to Photos.") || model.error != nil { break }
-            try await Task.sleep(for:.milliseconds(100))
-        }
-        XCTAssertNil(model.error)
-        XCTAssertEqual(model.status,L("Saved to Photos."))
-        XCTAssertNil(model.exportedFile,"A successful Photos save must not open Files")
     }
     private func videoModel(in folder:URL) async throws -> AppModel {
         let source=folder.appendingPathComponent("fixture.mov")
@@ -147,21 +160,24 @@ final class MobileTests:XCTestCase {
         model.selectedTab=3
         model.register3DView(view)
         model.export3DPicture()
-        let request=try XCTUnwrap(model.mobileExport)
-        request.start(.files)
-        let url=try await completedFile(model)
-        let picture=try XCTUnwrap(UIImage(contentsOfFile:url.path)?.cgImage)
+        let file=try await completedFile(model)
+        let picture=try XCTUnwrap(UIImage(contentsOfFile:file.url.path)?.cgImage)
         XCTAssertEqual(picture.width,320);XCTAssertEqual(picture.height,180)
-        model.finishFileExport(false)
+        model.finishFileExport(file, completed:false, error:nil)
         XCTAssertEqual(view.cameraState,before)
         var adjusted=before
         adjusted.fieldOfView=60
         try view.restoreCamera(adjusted)
-        model.cameraChanged(adjusted)
+        view.orbit(dx:0,dy:0.9)
+        view.orbit(dx:1.3,dy:0)
+        model.cameraChanged(view.cameraState)
         model.resetCamera()
         XCTAssertNil(model.cameraState)
         let braid=try XCTUnwrap(model.curves)
         view.fit(columns:braid.columns,rows:braid.rows)
         XCTAssertEqual(view.cameraState,initial)
+        XCTAssertEqual(view.cameraNode.simdWorldUp.x,0,accuracy:0.00001)
+        XCTAssertEqual(view.cameraNode.simdWorldUp.y,1,accuracy:0.00001)
+        XCTAssertEqual(view.cameraNode.simdWorldRight.y,0,accuracy:0.00001)
     }
 }

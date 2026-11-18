@@ -23,13 +23,15 @@ or later; the Mac app continues to support macOS 14 (Sonoma) or later.
   The red frame uses the Prepare dimensions until you choose a size in 3D.
 - Result: pinch to zoom and drag the enlarged picture; Fit resets the view.
   The PNG retains the completed weave's dimensions. Set the next size in Prepare.
-- Open pictures and videos through the standard Photos picker or Files picker.
-- Pictures and woven videos offer Photos or Files when exported. PDF, GLB, USDZ,
-  project and data exports use Files only. Photos access is requested only when
-  saving to Photos, and requires add-only access. If permission is refused, the
-  completed export remains available through Files. The export toolbar button
-  is available from every iPhone tab and from Result and 3D on iPad. Capturing
-  a 3D view as PNG requires the 3D tab.
+- Open pictures and videos from the Photos or Files picker. From another app,
+  share a single photo or video and choose BraidArt. Tap Done, then open BraidArt
+  to load it in Prepare. Each return to BraidArt imports the next pending share.
+- Choose an export format to open the system share sheet. Available actions
+  depend on the file type and installed apps. Pictures and videos can be saved
+  to Photos, and files can be saved to Files or shared with other apps. Solution
+  and tile data is shared as a ZIP archive. The export button is available from
+  every iPhone tab and from Result and 3D on iPad. Capturing a 3D view as PNG
+  requires the 3D tab.
 - Help opens automatically on the first launch on each device. It remains
   accessible from the information button on later launches. It shares the Mac
   illustrated help, with the
@@ -77,9 +79,11 @@ xcodebuild -project iOS/BraidArt-iOS.xcodeproj -scheme BraidArt \
   -allowProvisioningUpdates build
 ```
 
-The checked-in Xcode project can also be opened directly. Select your development
-team in Xcode if different from the repository's existing local team. Regenerate
-the project after adding sources or changing `iOS/project.yml`.
+The checked-in Xcode project can also be opened directly. The app and Share
+Extension use `group.com.christophefav.BraidArt` for the local import handoff.
+When signing with another development team, use an App Group registered to that
+team in `BraidArt.entitlements` and `SharedMediaInbox.swift`. Regenerate the
+project after adding sources or changing `iOS/project.yml`.
 
 `Scripts/build-solver-ios.sh` builds pinned COIN-OR sources as static iOS libraries;
 no external solver executable or downloaded runtime is used on the device. Device
@@ -98,12 +102,16 @@ xcodebuild -project iOS/BraidArt-iOS.xcodeproj -scheme BraidArt \
   -allowProvisioningUpdates test
 ```
 
-Hosted tests exercise native weaving, picture export destinations, PDF/GLB/USDZ
-Files exports, camera controls, touch recognizer configuration, 3D PNG capture,
-and video decoding/weaving/MP4 export with audio. The iPad UI test exercises
-weaving, result pinch zoom, 3D drag/pinch, destination choice and the Files picker,
-and saves screenshots. Its synthetic fixture is enabled only in Debug builds
-with `--ui-fixture`.
+Hosted tests exercise native weaving, shareable PNG/PDF/GLB/USDZ/ZIP payloads,
+shared photo and video import, camera controls, touch recognizer configuration,
+3D PNG capture, and video decoding/weaving/MP4 export with audio. The iPad UI test
+exercises weaving, result pinch zoom, 3D drag/pinch, the share sheet and the Files
+picker, and saves screenshots. Its synthetic fixture is enabled only in Debug
+builds with `--ui-fixture`.
+
+To check the system import handoff, share a photo or video from Files or Photos
+to BraidArt, tap Done, and return to the app. Confirm the media loads in Prepare
+and Weave Image is enabled once sampling completes.
 
 Physical iPhone validation was completed on an iPhone 12 Pro Max running iOS
 27.0.1. Fifteen hosted tests passed, including native solving, camera and gesture

@@ -37,6 +37,15 @@ enum PhoneLiveSettings: String, CaseIterable, Identifiable {
         }
     }
 
+    @MainActor func isEnabled(for model: AppModel) -> Bool {
+        guard !model.blocksEditing else { return false }
+        switch self {
+        case .dimensions: return model.canChangeOutputDimensions
+        case .imageWidth, .luminance: return model.sourceImage != nil
+        case .geometry, .pictureDimensions: return true
+        }
+    }
+
     @MainActor @ViewBuilder
     func controls(_ settings: SettingsControls) -> some View {
         switch self {
@@ -44,10 +53,6 @@ enum PhoneLiveSettings: String, CaseIterable, Identifiable {
             settings.outputDimensions(compact: true)
         case .imageWidth:
             settings.imageWidth
-            if !settings.state.hasSourceImage && settings.state.hasProject {
-                Text(L("This project contains the sampled image. Open the original picture to change the crop or resize."))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
         case .luminance:
             settings.luminance
         case .geometry:
