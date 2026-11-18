@@ -81,7 +81,10 @@ struct HelpView: View {
                     HStack(spacing:16) {
                         Image(platformImage:AppIcon.image).resizable().interpolation(.low).frame(width:64,height:64).clipShape(RoundedRectangle(cornerRadius:12)).accessibilityHidden(true)
                         VStack(alignment:.leading,spacing:5) {
-                            Text(L("BraidArt Help")).font(.largeTitle.weight(.semibold))
+                            Text(L("BraidArt Help"))
+                                .font(.largeTitle.weight(.semibold))
+                                .fixedSize(horizontal:false,vertical:true)
+                                .accessibilityAddTraits(.isHeader)
                             Text(L("Turn a picture into woven art.")).font(.title3).foregroundStyle(.secondary)
                         }
                     }.id(HelpTopic.overview)

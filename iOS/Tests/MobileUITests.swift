@@ -466,12 +466,13 @@ final class MobileUITests:XCTestCase {
         let language=["-AppleLanguages","(fr)","-AppleLocale","fr_FR"]
         // The argument overrides only this launch; the helper still saves its marker.
         app.launchArguments=["-hasShownFirstLaunchHelp","NO"]+language
-        XCUIDevice.shared.orientation = .landscapeLeft
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        XCUIDevice.shared.orientation = isPad ? .landscapeLeft : .portrait
         app.launch()
         let close=app.buttons["closeHelp"]
         XCTAssertTrue(close.waitForExistence(timeout:15))
         XCTAssertTrue(app.descendants(matching:.any)["helpBookLink"].firstMatch.isHittable)
-        screenshot("iPad first-launch help")
+        screenshot(isPad ? "iPad French first-launch help" : "iPhone French first-launch help")
         close.tap()
         app.terminate()
         app.launchArguments=language
