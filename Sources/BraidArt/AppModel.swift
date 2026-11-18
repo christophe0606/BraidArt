@@ -164,7 +164,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var customDimensions:[PictureExportSize]=[]
     @Published var dimensionManagerTarget:DimensionSelectionTarget?
     private let defaults:UserDefaults
-    private static let customDimensionsKey="customOutputDimensions"
+    static let customDimensionsKey="customOutputDimensions"
     // Camera gestures do not need to invalidate SwiftUI on every mouse movement.
     private(set) var cameraState:CameraState?
     private weak var threeDView:BraidMetalView?

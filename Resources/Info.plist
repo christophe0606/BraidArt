@@ -5,7 +5,7 @@
 <key>CFBundleLocalizations</key><array><string>en</string><string>fr</string></array>
 <key>CFBundleName</key><string>BraidArt</string>
 <key>CFBundleDisplayName</key><string>BraidArt</string>
-<key>CFBundleIdentifier</key><string>org.braidart.mac</string>
+<key>CFBundleIdentifier</key><string>com.christophefav.BraidArt</string>
 <key>CFBundleExecutable</key><string>BraidArt</string>
 <key>CFBundleIconFile</key><string>BraidArtIcon.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>

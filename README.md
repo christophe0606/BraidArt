@@ -190,11 +190,11 @@ open dist/BraidArt.app
 ```
 
 Help opens automatically on the first launch for each macOS user. The app saves
-`hasShownFirstLaunchHelp` in its `org.braidart.mac` preferences. To test the first
-launch again, quit BraidArt, then run from the repository directory:
+`hasShownFirstLaunchHelp` in its `com.christophefav.BraidArt` preferences. To test
+the first launch again, quit BraidArt, then run from the repository directory:
 
 ```sh
-defaults write org.braidart.mac hasShownFirstLaunchHelp -bool false
+defaults write com.christophefav.BraidArt hasShownFirstLaunchHelp -bool false
 open dist/BraidArt.app
 ```
 
@@ -202,7 +202,7 @@ Only this flag is reset; other preferences are preserved. After the help opens,
 the flag becomes `true` again. To inspect it:
 
 ```sh
-defaults read org.braidart.mac hasShownFirstLaunchHelp
+defaults read com.christophefav.BraidArt hasShownFirstLaunchHelp
 ```
 
 The automatic help also appears once for existing users upgrading from a version

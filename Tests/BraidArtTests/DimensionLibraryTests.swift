@@ -5,6 +5,33 @@ import BraidCore
 @testable import BraidArt
 
 final class DimensionLibraryTests:XCTestCase {
+    @MainActor func testMacBundleIdentifierUpgradeMigratesPreferencesOnce() throws {
+        let previousSuite = "BraidArt.PreviousPreferences.\(UUID().uuidString)"
+        let currentSuite = "BraidArt.CurrentPreferences.\(UUID().uuidString)"
+        let previous = try XCTUnwrap(UserDefaults(suiteName: previousSuite))
+        let current = try XCTUnwrap(UserDefaults(suiteName: currentSuite))
+        defer {
+            previous.removePersistentDomain(forName: previousSuite)
+            current.removePersistentDomain(forName: currentSuite)
+        }
+
+        let preset = try AppModel(defaults: previous).addCustomDimensions(name: "Print", width: 1200, height: 1600)
+        previous.set(true, forKey: FirstLaunchHelp.preferenceKey)
+        current.set(false, forKey: FirstLaunchHelp.preferenceKey)
+
+        BraidArtApp.migratePreferences(defaults: current, from: previousSuite, to: currentSuite)
+        XCTAssertEqual(AppModel(defaults: current).customDimensions, [preset])
+        XCTAssertFalse(current.bool(forKey: FirstLaunchHelp.preferenceKey))
+
+        current.removeObject(forKey: AppModel.customDimensionsKey)
+        current.removeObject(forKey: FirstLaunchHelp.preferenceKey)
+        BraidArtApp.migratePreferences(defaults: current, from: previousSuite, to: currentSuite)
+        XCTAssertTrue(AppModel(defaults: current).customDimensions.isEmpty)
+        XCTAssertNil(current.object(forKey: FirstLaunchHelp.preferenceKey))
+        XCTAssertEqual(AppModel(defaults: previous).customDimensions, [preset])
+        XCTAssertTrue(previous.bool(forKey: FirstLaunchHelp.preferenceKey))
+    }
+
     @MainActor func testCustomLibraryPersistsEditsAndDeletionWithoutChangingBuiltIns() throws {
         let suite="BraidArt.DimensionTests.\(UUID().uuidString)",defaults=try XCTUnwrap(UserDefaults(suiteName:suite))
         defer { defaults.removePersistentDomain(forName:suite) }

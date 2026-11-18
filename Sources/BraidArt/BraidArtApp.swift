@@ -7,6 +7,27 @@ import BraidCore
 struct BraidArtApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var model=AppModel()
+
+    init() {
+        if let identifier = Bundle.main.bundleIdentifier {
+            Self.migratePreferences(defaults: .standard, from: "org.braidart.mac", to: identifier)
+        }
+    }
+
+    static func migratePreferences(defaults: UserDefaults, from previousIdentifier: String, to identifier: String) {
+        let migrationKey = "hasMigratedMacBundlePreferences"
+        let current = defaults.persistentDomain(forName: identifier) ?? [:]
+        guard identifier != previousIdentifier, current[migrationKey] as? Bool != true else { return }
+
+        let previous = defaults.persistentDomain(forName: previousIdentifier) ?? [:]
+        for key in [AppModel.customDimensionsKey, FirstLaunchHelp.preferenceKey] where current[key] == nil {
+            if let value = previous[key] {
+                defaults.set(value, forKey: key)
+            }
+        }
+        defaults.set(true, forKey: migrationKey)
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView(model:model)
